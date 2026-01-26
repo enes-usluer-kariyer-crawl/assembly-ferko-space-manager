@@ -8,6 +8,7 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 
 import type { Reservation, Room } from "@/lib/actions/reservations";
 import { NewReservationDialog } from "./NewReservationDialog";
+import { ReservationDetailDialog } from "./ReservationDetailDialog";
 import { CalendarToolbar } from "./CalendarToolbar";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -45,6 +46,8 @@ type CalendarEvent = {
     roomId: string;
     status: string;
     description: string | null;
+    tags?: string[];
+    cateringRequested?: boolean;
   };
 };
 
@@ -59,6 +62,8 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
   // Convert reservations to calendar events
   const events: CalendarEvent[] = useMemo(() => {
@@ -72,15 +77,34 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
         roomId: reservation.room_id,
         status: reservation.status,
         description: reservation.description,
+        tags: reservation.tags,
+        cateringRequested: reservation.catering_requested,
       },
     }));
   }, [reservations]);
 
-  // Event style getter for color-coding by room
+  // Event style getter for color-coding by room and status
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
     const colors = ROOM_COLORS[event.resource.roomName] || DEFAULT_COLOR;
     const isPending = event.resource.status === "pending";
 
+    if (isPending) {
+      // Pending: Light orange/amber background with dashed border
+      return {
+        style: {
+          backgroundColor: "#fff7ed", // Light amber background
+          border: "2px dashed #f59e0b", // Dashed amber border
+          opacity: 0.85,
+          color: "#b45309", // Dark amber text
+          borderRadius: "6px",
+          fontSize: "0.875rem",
+          fontWeight: 500,
+          boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        },
+      };
+    }
+
+    // Approved: Solid colors based on room
     return {
       style: {
         backgroundColor: `${colors.bg}15`, // Light background with 15% opacity
@@ -88,9 +112,9 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
         borderTop: "none",
         borderRight: "none",
         borderBottom: "none",
-        opacity: isPending ? 0.7 : 1,
+        opacity: 1,
         color: colors.border, // Text color matches border
-        borderRadius: "6px", // rounded-md equivalent
+        borderRadius: "6px",
         fontSize: "0.875rem",
         fontWeight: 500,
         boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
@@ -105,6 +129,12 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
       end: slotInfo.end,
     });
     setDialogOpen(true);
+  }, []);
+
+  // Handle event selection (clicking on existing event)
+  const handleSelectEvent = useCallback((event: CalendarEvent) => {
+    setSelectedEvent(event);
+    setDetailDialogOpen(true);
   }, []);
 
   // Handle opening dialog with no pre-selected time
@@ -168,6 +198,22 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
             </div>
           );
         })}
+        <div className="ml-4 border-l pl-4 flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div
+              className="w-4 h-4 rounded"
+              style={{ border: "2px dashed #f59e0b", backgroundColor: "#fff7ed" }}
+            />
+            <span className="text-sm text-muted-foreground">Onay Bekliyor</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div
+              className="w-4 h-4 rounded"
+              style={{ borderLeft: "4px solid #3b82f6", backgroundColor: "#3b82f615" }}
+            />
+            <span className="text-sm text-muted-foreground">Onaylandı</span>
+          </div>
+        </div>
       </div>
 
       {/* Calendar */}
@@ -183,6 +229,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
           views={[Views.MONTH, Views.WEEK, Views.DAY]}
           selectable
           onSelectSlot={handleSelectSlot}
+          onSelectEvent={handleSelectEvent}
           eventPropGetter={eventStyleGetter}
           min={new Date(0, 0, 0, 8, 0, 0)}
           max={new Date(0, 0, 0, 22, 0, 0)}
@@ -215,6 +262,13 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
         initialStartTime={selectedSlot?.start}
         initialEndTime={selectedSlot?.end}
         onSuccess={handleReservationCreated}
+      />
+
+      {/* Reservation Detail Dialog */}
+      <ReservationDetailDialog
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        event={selectedEvent}
       />
     </div>
   );
