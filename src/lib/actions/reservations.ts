@@ -105,29 +105,42 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
 
 export async function getRooms(): Promise<{
   success: boolean;
-  data?: Room[];
+  data: Room[];
   error?: string;
 }> {
-  const supabase = await createClient();
+  try {
+    console.log("Fetching rooms...");
+    const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("rooms")
-    .select("id, name, capacity, features, is_active")
-    .eq("is_active", true)
-    .order("name", { ascending: true });
+    const { data, error } = await supabase
+      .from("rooms")
+      .select("id, name, capacity, features, is_active")
+      .eq("is_active", true)
+      .order("name", { ascending: true });
 
-  if (error) {
-    console.error("Error fetching rooms:", error);
+    if (error) {
+      console.error("Error fetching rooms:", error.message, error.details, error.hint);
+      return {
+        success: false,
+        data: [],
+        error: `Failed to fetch rooms: ${error.message}`,
+      };
+    }
+
+    console.log(`Successfully fetched ${data?.length ?? 0} rooms`);
+    return {
+      success: true,
+      data: (data ?? []) as Room[],
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    console.error("Unexpected error fetching rooms:", errorMessage);
     return {
       success: false,
-      error: "Failed to fetch rooms.",
+      data: [],
+      error: `Unexpected error: ${errorMessage}`,
     };
   }
-
-  return {
-    success: true,
-    data: data as Room[],
-  };
 }
 
 export type CreateReservationInput = {
