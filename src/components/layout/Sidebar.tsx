@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, Shield, User } from "lucide-react";
+import { Home, CalendarDays, Shield, User, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { signOut } from "@/lib/actions/auth";
 
 interface SidebarProps {
   user: {
@@ -114,7 +115,7 @@ export function Sidebar({ user, isAdmin }: SidebarProps) {
         {/* User Profile */}
         {user && (
           <div className="border-t border-[hsl(var(--sidebar-border))] p-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-4">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--sidebar-accent))]">
                 <User className="h-5 w-5 text-[hsl(var(--sidebar-muted-foreground))]" />
               </div>
@@ -125,6 +126,13 @@ export function Sidebar({ user, isAdmin }: SidebarProps) {
                 </p>
               </div>
             </div>
+            <button
+              onClick={() => signOut()}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+              Çıkış Yap
+            </button>
           </div>
         )}
       </div>
