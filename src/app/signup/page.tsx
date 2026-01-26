@@ -2,6 +2,8 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { signup } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +29,14 @@ function SubmitButton() {
 
 export default function SignupPage() {
   const [state, formAction] = useFormState(signup, undefined);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (state?.success) {
+      router.push("/");
+      router.refresh();
+    }
+  }, [state, router]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 dark:bg-gray-900 sm:px-6 lg:px-8">
@@ -41,6 +51,15 @@ export default function SignupPage() {
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="full_name">Ad Soyad</Label>
+              <Input
+                id="full_name"
+                name="full_name"
+                placeholder="Ad Soyad"
+                required
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
