@@ -62,9 +62,10 @@ USING ( public.is_admin() );
 -- =======================
 -- ROOMS
 -- =======================
--- SELECT: All authenticated users can view rooms.
+-- SELECT: All users (including anonymous) can view rooms.
+-- Room data is not sensitive and needs to be visible on the public calendar.
 CREATE POLICY "rooms_select_policy" ON rooms
-FOR SELECT TO authenticated
+FOR SELECT TO anon, authenticated
 USING ( true );
 
 -- INSERT: Only Admins.
@@ -87,9 +88,9 @@ USING ( public.is_admin() );
 -- =======================
 -- RESERVATIONS
 -- =======================
--- SELECT: Everyone sees reservations (for calendar).
+-- SELECT: Everyone (including anonymous) sees reservations (for calendar).
 CREATE POLICY "reservations_select_policy" ON reservations
-FOR SELECT TO authenticated
+FOR SELECT TO anon, authenticated
 USING ( true );
 
 -- INSERT: Authenticated users can insert their own.

@@ -14,6 +14,7 @@ DROP POLICY IF EXISTS "Rooms are viewable by authenticated users" ON rooms;
 CREATE POLICY "Enable read access for all users"
     ON "public"."rooms"
     FOR SELECT
+    TO anon, authenticated
     USING (true);
 
 -- 4. Keep the admin-only policy for write operations (if it doesn't exist)
