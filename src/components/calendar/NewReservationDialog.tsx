@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useFormStatus } from "react-dom";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import type { Room } from "@/lib/actions/reservations";
 import { createReservation } from "@/lib/actions/reservations";
@@ -40,6 +42,35 @@ const BIG_EVENT_TAGS = [
   "ÖM- HR Small Talks",
 ];
 
+function SubmitButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" disabled={pending}>
+      {pending ? "Oluşturuluyor..." : "Rezervasyon Oluştur"}
+    </Button>
+  );
+}
+
+function CancelButton({
+  onCancel,
+}: {
+  onCancel: () => void;
+}) {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={onCancel}
+      disabled={pending}
+    >
+      İptal
+    </Button>
+  );
+}
+
 export function NewReservationDialog({
   open,
   onOpenChange,
@@ -48,7 +79,6 @@ export function NewReservationDialog({
   initialEndTime,
   onSuccess,
 }: NewReservationDialogProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Form state
@@ -59,7 +89,7 @@ export function NewReservationDialog({
   const [startTime, setStartTime] = useState("");
   const [endDate, setEndDate] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [selectedTag, setSelectedTag] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [cateringRequested, setCateringRequested] = useState(false);
 
   // Reset form when dialog opens/closes or initial times change
@@ -69,7 +99,7 @@ export function NewReservationDialog({
       setTitle("");
       setDescription("");
       setRoomId("");
-      setSelectedTag("");
+      setSelectedTags([]);
       setCateringRequested(false);
 
       if (initialStartTime) {
@@ -90,57 +120,64 @@ export function NewReservationDialog({
     }
   }, [open, initialStartTime, initialEndTime]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleTagToggle = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag)
+        ? prev.filter((t) => t !== tag)
+        : [...prev, tag]
+    );
+  };
+
+  const handleFormAction = async (formData: FormData) => {
     setError(null);
-    setIsSubmitting(true);
+
+    // Validate form
+    const formTitle = formData.get("title") as string;
+    const formRoomId = formData.get("roomId") as string;
+    const formStartDate = formData.get("startDate") as string;
+    const formStartTime = formData.get("startTime") as string;
+    const formEndDate = formData.get("endDate") as string;
+    const formEndTime = formData.get("endTime") as string;
+    const formDescription = formData.get("description") as string;
+
+    if (!formTitle?.trim()) {
+      setError("Lütfen bir başlık girin.");
+      return;
+    }
+
+    if (!formRoomId) {
+      setError("Lütfen bir oda seçin.");
+      return;
+    }
+
+    if (!formStartDate || !formStartTime || !formEndDate || !formEndTime) {
+      setError("Lütfen başlangıç ve bitiş tarih/saatini girin.");
+      return;
+    }
+
+    // Construct ISO datetime strings
+    const startDateTime = `${formStartDate}T${formStartTime}:00`;
+    const endDateTime = `${formEndDate}T${formEndTime}:00`;
+
+    // Validate times
+    if (new Date(endDateTime) <= new Date(startDateTime)) {
+      setError("Bitiş zamanı başlangıç zamanından sonra olmalıdır.");
+      return;
+    }
 
     try {
-      // Validate form
-      if (!title.trim()) {
-        setError("Lütfen bir başlık girin.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (!roomId) {
-        setError("Lütfen bir oda seçin.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (!startDate || !startTime || !endDate || !endTime) {
-        setError("Lütfen başlangıç ve bitiş tarih/saatini girin.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Construct ISO datetime strings
-      const startDateTime = `${startDate}T${startTime}:00`;
-      const endDateTime = `${endDate}T${endTime}:00`;
-
-      // Validate times
-      if (new Date(endDateTime) <= new Date(startDateTime)) {
-        setError("Bitiş zamanı başlangıç zamanından sonra olmalıdır.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      const tags = selectedTag ? [selectedTag] : [];
-
       const result = await createReservation({
-        roomId,
-        title: title.trim(),
-        description: description.trim() || undefined,
+        roomId: formRoomId,
+        title: formTitle.trim(),
+        description: formDescription?.trim() || undefined,
         startTime: startDateTime,
         endTime: endDateTime,
-        tags,
+        tags: selectedTags,
         cateringRequested,
       });
 
       if (!result.success) {
         setError(result.error || "Rezervasyon oluşturulamadı.");
-        setIsSubmitting(false);
         return;
       }
 
@@ -148,8 +185,6 @@ export function NewReservationDialog({
     } catch (err) {
       console.error("Error creating reservation:", err);
       setError("Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -163,7 +198,7 @@ export function NewReservationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form action={handleFormAction} className="space-y-4">
           {error && (
             <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
               {error}
@@ -175,17 +210,18 @@ export function NewReservationDialog({
             <Label htmlFor="title">Başlık *</Label>
             <Input
               id="title"
+              name="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Toplantı başlığını girin"
-              disabled={isSubmitting}
             />
           </div>
 
           {/* Room selection */}
           <div className="space-y-2">
             <Label htmlFor="room">Oda *</Label>
-            <Select value={roomId} onValueChange={setRoomId} disabled={isSubmitting}>
+            <input type="hidden" name="roomId" value={roomId} />
+            <Select value={roomId} onValueChange={setRoomId}>
               <SelectTrigger>
                 <SelectValue placeholder="Oda seçin" />
               </SelectTrigger>
@@ -205,20 +241,20 @@ export function NewReservationDialog({
               <Label htmlFor="startDate">Başlangıç Tarihi *</Label>
               <Input
                 id="startDate"
+                name="startDate"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="startTime">Başlangıç Saati *</Label>
               <Input
                 id="startTime"
+                name="startTime"
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -229,40 +265,44 @@ export function NewReservationDialog({
               <Label htmlFor="endDate">Bitiş Tarihi *</Label>
               <Input
                 id="endDate"
+                name="endDate"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="endTime">Bitiş Saati *</Label>
               <Input
                 id="endTime"
+                name="endTime"
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                disabled={isSubmitting}
               />
             </div>
           </div>
 
-          {/* Tag selection (for big events) */}
+          {/* Tags multi-select (for big events) */}
           <div className="space-y-2">
-            <Label htmlFor="tag">Etkinlik Türü</Label>
-            <Select value={selectedTag} onValueChange={setSelectedTag} disabled={isSubmitting}>
-              <SelectTrigger>
-                <SelectValue placeholder="Etkinlik türü seçin (opsiyonel)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Standart Toplantı</SelectItem>
-                {BIG_EVENT_TAGS.map((tag) => (
-                  <SelectItem key={tag} value={tag}>
+            <Label>Etiketler (Büyük Etkinlikler)</Label>
+            <div className="space-y-2 rounded-md border p-3">
+              {BIG_EVENT_TAGS.map((tag) => (
+                <div key={tag} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`tag-${tag}`}
+                    checked={selectedTags.includes(tag)}
+                    onCheckedChange={() => handleTagToggle(tag)}
+                  />
+                  <Label
+                    htmlFor={`tag-${tag}`}
+                    className="font-normal cursor-pointer"
+                  >
                     {tag}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  </Label>
+                </div>
+              ))}
+            </div>
             <p className="text-xs text-muted-foreground">
               Büyük etkinlikler tüm odaları bloke eder.
             </p>
@@ -273,41 +313,29 @@ export function NewReservationDialog({
             <Label htmlFor="description">Açıklama</Label>
             <Textarea
               id="description"
+              name="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Toplantı hakkında ek bilgi (opsiyonel)"
               rows={3}
-              disabled={isSubmitting}
             />
           </div>
 
           {/* Catering checkbox */}
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="catering"
               checked={cateringRequested}
-              onChange={(e) => setCateringRequested(e.target.checked)}
-              disabled={isSubmitting}
-              className="h-4 w-4 rounded border-gray-300"
+              onCheckedChange={(checked) => setCateringRequested(checked === true)}
             />
-            <Label htmlFor="catering" className="font-normal">
+            <Label htmlFor="catering" className="font-normal cursor-pointer">
               İkram talep ediyorum
             </Label>
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              İptal
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Oluşturuluyor..." : "Rezervasyon Oluştur"}
-            </Button>
+            <CancelButton onCancel={() => onOpenChange(false)} />
+            <SubmitButton />
           </DialogFooter>
         </form>
       </DialogContent>
