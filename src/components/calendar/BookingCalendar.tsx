@@ -139,8 +139,12 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
             Takvimde boş bir alana tıklayarak veya butona basarak yeni rezervasyon oluşturabilirsiniz
           </p>
         </div>
-        <Button onClick={handleNewReservation} className="gap-2">
-          <Plus className="h-4 w-4" />
+        <Button
+          onClick={handleNewReservation}
+          size="lg"
+          className="gap-2 px-6 py-3 text-base font-semibold shadow-md hover:shadow-lg transition-shadow"
+        >
+          <Plus className="h-5 w-5" />
           Yeni Rezervasyon
         </Button>
       </div>
