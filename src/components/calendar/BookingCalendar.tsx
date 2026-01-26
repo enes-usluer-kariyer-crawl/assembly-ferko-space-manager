@@ -8,6 +8,7 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 
 import type { Reservation, Room } from "@/lib/actions/reservations";
 import { NewReservationDialog } from "./NewReservationDialog";
+import { CalendarToolbar } from "./CalendarToolbar";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
@@ -82,14 +83,17 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
 
     return {
       style: {
-        backgroundColor: colors.bg,
-        borderColor: colors.border,
-        borderWidth: "2px",
-        borderStyle: isPending ? "dashed" : "solid",
-        opacity: isPending ? 0.8 : 1,
-        color: "white",
-        borderRadius: "4px",
+        backgroundColor: `${colors.bg}15`, // Light background with 15% opacity
+        borderLeft: `4px solid ${colors.border}`, // Left border highlight
+        borderTop: "none",
+        borderRight: "none",
+        borderBottom: "none",
+        opacity: isPending ? 0.7 : 1,
+        color: colors.border, // Text color matches border
+        borderRadius: "6px", // rounded-md equivalent
         fontSize: "0.875rem",
+        fontWeight: 500,
+        boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
       },
     };
   }, []);
@@ -195,6 +199,9 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
             agenda: "Ajanda",
             noEventsInRange: "Bu aralıkta rezervasyon bulunmuyor.",
             showMore: (count) => `+${count} daha`,
+          }}
+          components={{
+            toolbar: CalendarToolbar,
           }}
           style={{ height: "100%" }}
         />

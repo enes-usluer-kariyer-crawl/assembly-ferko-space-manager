@@ -92,73 +92,99 @@
   font-family: inherit;
 }
 
+/* Hide default toolbar - we use custom */
 .rbc-toolbar {
-  @apply mb-4 flex flex-wrap gap-2;
+  @apply hidden;
 }
 
-.rbc-toolbar button {
-  @apply px-3 py-1.5 text-sm rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors;
-}
-
-.rbc-toolbar button.rbc-active {
-  @apply bg-primary text-primary-foreground hover:bg-primary/90;
-}
-
+/* Day/Week Headers - uppercase, smaller text */
 .rbc-header {
-  @apply py-2 px-1 text-sm font-medium border-b border-border bg-muted/30;
+  @apply py-3 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/40 bg-muted/20;
 }
 
+.rbc-header + .rbc-header {
+  @apply border-l border-border/30;
+}
+
+/* Main calendar containers */
 .rbc-month-view,
 .rbc-time-view {
-  @apply border border-border rounded-lg overflow-hidden;
+  @apply border border-border/40 rounded-xl overflow-hidden bg-background;
 }
 
+/* Softer grid lines */
 .rbc-day-bg {
-  @apply border-l border-border;
+  @apply border-l border-border/30;
 }
 
 .rbc-day-bg:first-child {
   @apply border-l-0;
 }
 
+.rbc-month-row {
+  @apply border-b border-border/30;
+}
+
+.rbc-month-row:last-child {
+  @apply border-b-0;
+}
+
 .rbc-off-range-bg {
-  @apply bg-muted/30;
+  @apply bg-muted/20;
 }
 
 .rbc-today {
   @apply bg-primary/5;
 }
 
+/* Time view specific styles */
+.rbc-time-header {
+  @apply border-b border-border/30;
+}
+
 .rbc-time-header-content {
-  @apply border-l border-border;
+  @apply border-l border-border/30;
 }
 
 .rbc-time-content {
-  @apply border-t border-border;
+  @apply border-t-0;
+}
+
+.rbc-time-content > * + * > * {
+  @apply border-l border-border/30;
 }
 
 .rbc-time-slot {
-  @apply border-t border-border/50;
+  @apply border-t border-border/20;
 }
 
 .rbc-timeslot-group {
-  @apply border-b border-border;
+  @apply border-b border-border/30;
 }
 
 .rbc-time-gutter {
-  @apply bg-muted/20;
+  @apply bg-muted/10;
+}
+
+.rbc-time-gutter .rbc-timeslot-group {
+  @apply border-b border-border/20;
 }
 
 .rbc-label {
-  @apply text-xs text-muted-foreground px-2;
+  @apply text-xs text-muted-foreground px-2 font-medium;
 }
 
 .rbc-current-time-indicator {
-  @apply bg-destructive;
+  @apply bg-destructive h-0.5;
 }
 
+/* Event styling */
 .rbc-event {
-  @apply rounded px-1 py-0.5 text-xs font-medium shadow-sm;
+  @apply rounded-md px-2 py-1 text-sm font-medium border-0;
+}
+
+.rbc-event:focus {
+  @apply outline-none ring-2 ring-ring ring-offset-2;
 }
 
 .rbc-event-label {
@@ -170,19 +196,56 @@
 }
 
 .rbc-show-more {
-  @apply text-xs text-primary hover:underline;
+  @apply text-xs text-primary font-medium hover:underline mt-1;
 }
 
+/* Month view date cells */
 .rbc-date-cell {
-  @apply text-right p-1 text-sm;
+  @apply text-right p-2 text-sm;
 }
 
 .rbc-date-cell > a {
-  @apply text-foreground hover:text-primary;
+  @apply text-foreground hover:text-primary transition-colors;
+}
+
+.rbc-date-cell.rbc-now > a {
+  @apply bg-primary text-primary-foreground rounded-full w-7 h-7 inline-flex items-center justify-center;
 }
 
 .rbc-row-segment {
-  @apply px-0.5;
+  @apply px-1 py-0.5;
+}
+
+/* Agenda view */
+.rbc-agenda-view {
+  @apply border border-border/40 rounded-xl overflow-hidden;
+}
+
+.rbc-agenda-table {
+  @apply w-full;
+}
+
+.rbc-agenda-date-cell,
+.rbc-agenda-time-cell {
+  @apply text-sm text-muted-foreground whitespace-nowrap px-3 py-2;
+}
+
+.rbc-agenda-event-cell {
+  @apply px-3 py-2;
+}
+
+/* Selection styles */
+.rbc-slot-selection {
+  @apply bg-primary/20 border border-primary/40 rounded;
+}
+
+.rbc-selected-cell {
+  @apply bg-primary/10;
+}
+
+/* Day/Week view columns */
+.rbc-day-slot .rbc-events-container {
+  @apply mr-2;
 }
 
 /* Dark mode adjustments */
@@ -192,4 +255,12 @@
 
 .dark .rbc-today {
   @apply bg-primary/10;
+}
+
+.dark .rbc-header {
+  @apply bg-muted/10;
+}
+
+.dark .rbc-time-gutter {
+  @apply bg-muted/5;
 }
