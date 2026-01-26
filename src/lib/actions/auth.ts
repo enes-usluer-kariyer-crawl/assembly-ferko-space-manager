@@ -49,9 +49,6 @@ export async function signup(prevState: AuthState, formData: FormData) {
     return { error: error.message };
   }
 
-  // The trigger handle_new_user will automatically create the profile.
-  // We do not insert into profiles manually to avoid race conditions/duplicate key errors.
-
   return { success: true, error: null };
 }
 
