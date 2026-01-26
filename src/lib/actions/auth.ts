@@ -35,7 +35,9 @@ export async function signup(prevState: AuthState, formData: FormData) {
   const password = formData.get("password") as string;
   const full_name = formData.get("full_name") as string;
 
-  const { error } = await supabase.auth.signUp({
+  console.log(`Signup started for email: ${email}`);
+
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -45,8 +47,11 @@ export async function signup(prevState: AuthState, formData: FormData) {
     },
   });
 
+  console.log("Supabase signUp result:", { data, error });
+
   if (error) {
-    return { error: error.message };
+    console.error("SUPABASE ERROR:", error);
+    return { error: error.message || "Database error saving new user" };
   }
 
   return { success: true, error: null };
