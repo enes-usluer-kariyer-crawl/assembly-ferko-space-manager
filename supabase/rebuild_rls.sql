@@ -62,16 +62,26 @@ USING ( public.is_admin() );
 -- =======================
 -- ROOMS
 -- =======================
--- SELECT: Public access (everyone sees rooms).
+-- SELECT: All authenticated users can view rooms.
 CREATE POLICY "rooms_select_policy" ON rooms
 FOR SELECT TO authenticated
 USING ( true );
 
--- INSERT, UPDATE, DELETE: Only Admins.
-CREATE POLICY "rooms_admin_policy" ON rooms
-FOR ALL TO authenticated
+-- INSERT: Only Admins.
+CREATE POLICY "rooms_insert_policy" ON rooms
+FOR INSERT TO authenticated
+WITH CHECK ( public.is_admin() );
+
+-- UPDATE: Only Admins.
+CREATE POLICY "rooms_update_policy" ON rooms
+FOR UPDATE TO authenticated
 USING ( public.is_admin() )
 WITH CHECK ( public.is_admin() );
+
+-- DELETE: Only Admins.
+CREATE POLICY "rooms_delete_policy" ON rooms
+FOR DELETE TO authenticated
+USING ( public.is_admin() );
 
 
 -- =======================
