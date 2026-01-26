@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,8 @@ function SubmitButton() {
 }
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next") || "/";
   const [state, formAction] = useActionState(login, undefined);
 
   return (
@@ -42,6 +45,7 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-4">
+            <input type="hidden" name="next" value={nextUrl} />
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input

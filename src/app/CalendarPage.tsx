@@ -7,9 +7,10 @@ import { getReservations, type Reservation, type Room } from "@/lib/actions/rese
 type CalendarPageProps = {
   initialReservations: Reservation[];
   rooms: Room[];
+  isAuthenticated: boolean;
 };
 
-export function CalendarPage({ initialReservations, rooms }: CalendarPageProps) {
+export function CalendarPage({ initialReservations, rooms, isAuthenticated }: CalendarPageProps) {
   const [reservations, setReservations] = useState<Reservation[]>(initialReservations);
 
   const handleRefresh = useCallback(async () => {
@@ -24,6 +25,7 @@ export function CalendarPage({ initialReservations, rooms }: CalendarPageProps) 
       initialReservations={reservations}
       rooms={rooms}
       onRefresh={handleRefresh}
+      isAuthenticated={isAuthenticated}
     />
   );
 }

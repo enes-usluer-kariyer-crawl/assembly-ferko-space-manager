@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Calendar, dateFnsLocalizer, Views, SlotInfo } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -55,9 +56,11 @@ type BookingCalendarProps = {
   initialReservations: Reservation[];
   rooms: Room[];
   onRefresh: () => Promise<void>;
+  isAuthenticated: boolean;
 };
 
-export function BookingCalendar({ initialReservations, rooms, onRefresh }: BookingCalendarProps) {
+export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthenticated }: BookingCalendarProps) {
+  const router = useRouter();
   const [reservations, setReservations] = useState<Reservation[]>(initialReservations);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null);
@@ -124,12 +127,16 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
 
   // Handle slot selection (clicking on empty space)
   const handleSelectSlot = useCallback((slotInfo: SlotInfo) => {
+    if (!isAuthenticated) {
+      router.push("/login?next=/");
+      return;
+    }
     setSelectedSlot({
       start: slotInfo.start,
       end: slotInfo.end,
     });
     setDialogOpen(true);
-  }, []);
+  }, [isAuthenticated, router]);
 
   // Handle event selection (clicking on existing event)
   const handleSelectEvent = useCallback((event: CalendarEvent) => {
@@ -139,9 +146,13 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh }: Booki
 
   // Handle opening dialog with no pre-selected time
   const handleNewReservation = useCallback(() => {
+    if (!isAuthenticated) {
+      router.push("/login?next=/");
+      return;
+    }
     setSelectedSlot(null);
     setDialogOpen(true);
-  }, []);
+  }, [isAuthenticated, router]);
 
   // Handle reservation creation success
   const handleReservationCreated = useCallback(async () => {
