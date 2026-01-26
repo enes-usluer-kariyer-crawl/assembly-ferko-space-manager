@@ -4,6 +4,132 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkAvailability } from "./availability";
 
+export type Room = {
+  id: string;
+  name: string;
+  capacity: number;
+  features: string[];
+  is_active: boolean;
+};
+
+export type Reservation = {
+  id: string;
+  room_id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  start_time: string;
+  end_time: string;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  tags: string[];
+  catering_requested: boolean;
+  is_recurring: boolean;
+  rooms: {
+    id: string;
+    name: string;
+  };
+};
+
+export type GetReservationsParams = {
+  startDate?: string;
+  endDate?: string;
+  roomId?: string;
+};
+
+export async function getReservations(params?: GetReservationsParams): Promise<{
+  success: boolean;
+  data?: Reservation[];
+  error?: string;
+}> {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("reservations")
+    .select(
+      `
+      id,
+      room_id,
+      user_id,
+      title,
+      description,
+      start_time,
+      end_time,
+      status,
+      tags,
+      catering_requested,
+      is_recurring,
+      rooms (
+        id,
+        name
+      )
+    `
+    )
+    .in("status", ["pending", "approved"]);
+
+  if (params?.startDate) {
+    query = query.gte("start_time", params.startDate);
+  }
+
+  if (params?.endDate) {
+    query = query.lte("end_time", params.endDate);
+  }
+
+  if (params?.roomId) {
+    query = query.eq("room_id", params.roomId);
+  }
+
+  query = query.order("start_time", { ascending: true });
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("Error fetching reservations:", error);
+    return {
+      success: false,
+      error: "Failed to fetch reservations.",
+    };
+  }
+
+  // Transform the data to match our Reservation type
+  // Supabase returns rooms as an object (not array) for single foreign key relations
+  const reservations = (data ?? []).map((item) => ({
+    ...item,
+    rooms: item.rooms as unknown as { id: string; name: string },
+  })) as Reservation[];
+
+  return {
+    success: true,
+    data: reservations,
+  };
+}
+
+export async function getRooms(): Promise<{
+  success: boolean;
+  data?: Room[];
+  error?: string;
+}> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("rooms")
+    .select("id, name, capacity, features, is_active")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching rooms:", error);
+    return {
+      success: false,
+      error: "Failed to fetch rooms.",
+    };
+  }
+
+  return {
+    success: true,
+    data: data as Room[],
+  };
+}
+
 export type CreateReservationInput = {
   roomId: string;
   title: string;
