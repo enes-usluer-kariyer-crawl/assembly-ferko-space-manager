@@ -9,9 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "16.1.4",
-    "react": "^19",
-    "react-dom": "^19",
+    "next": "16.1.5",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
     "@supabase/supabase-js": "^2.91.1",
     "@supabase/ssr": "^0.8.0",
     "lucide-react": "^0.563.0",
@@ -32,11 +32,15 @@
     "typescript": "^5.7",
     "tailwindcss": "^3.4.1",
     "postcss": "^8",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "19.2.9",
+    "@types/react-dom": "19.2.3",
     "@types/node": "^22",
     "@types/react-big-calendar": "^1.16.3",
     "eslint": "^9",
-    "eslint-config-next": "16.1.4"
+    "eslint-config-next": "16.1.5"
+  },
+  "overrides": {
+    "@types/react": "19.2.9",
+    "@types/react-dom": "19.2.3"
   }
 }
