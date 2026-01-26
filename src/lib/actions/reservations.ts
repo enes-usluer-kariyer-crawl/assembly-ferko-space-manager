@@ -283,3 +283,152 @@ export async function createReservation(
     reservationId: reservation.id,
   };
 }
+
+export type UpdateReservationStatusResult = {
+  success: boolean;
+  error?: string;
+};
+
+export async function updateReservationStatus(
+  id: string,
+  status: "approved" | "rejected"
+): Promise<UpdateReservationStatusResult> {
+  if (!id) {
+    return {
+      success: false,
+      error: "Reservation ID is required.",
+    };
+  }
+
+  if (status !== "approved" && status !== "rejected") {
+    return {
+      success: false,
+      error: "Status must be 'approved' or 'rejected'.",
+    };
+  }
+
+  const supabase = await createClient();
+
+  // Get current user
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return {
+      success: false,
+      error: "You must be logged in to update a reservation.",
+    };
+  }
+
+  // Check if user is admin
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile) {
+    return {
+      success: false,
+      error: "Failed to retrieve user profile.",
+    };
+  }
+
+  if (profile.role !== "admin") {
+    return {
+      success: false,
+      error: "Only administrators can update reservation status.",
+    };
+  }
+
+  // Update the reservation status
+  const { error: updateError } = await supabase
+    .from("reservations")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (updateError) {
+    console.error("Error updating reservation status:", updateError);
+    return {
+      success: false,
+      error: "Failed to update reservation status.",
+    };
+  }
+
+  // Revalidate paths to refresh data
+  revalidatePath("/");
+  revalidatePath("/admin/approvals");
+  revalidatePath("/reservations");
+  revalidatePath("/calendar");
+
+  return {
+    success: true,
+  };
+}
+
+export type PendingReservation = {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  catering_requested: boolean;
+  created_at: string;
+  rooms: {
+    name: string;
+  };
+  profiles: {
+    full_name: string | null;
+    email: string;
+  };
+};
+
+export async function getPendingReservations(): Promise<{
+  success: boolean;
+  data?: PendingReservation[];
+  error?: string;
+}> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("reservations")
+    .select(
+      `
+      id,
+      title,
+      start_time,
+      end_time,
+      catering_requested,
+      created_at,
+      rooms (
+        name
+      ),
+      profiles (
+        full_name,
+        email
+      )
+    `
+    )
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching pending reservations:", error);
+    return {
+      success: false,
+      error: "Failed to fetch pending reservations.",
+    };
+  }
+
+  const reservations = (data ?? []).map((item) => ({
+    ...item,
+    rooms: item.rooms as unknown as { name: string },
+    profiles: item.profiles as unknown as { full_name: string | null; email: string },
+  })) as PendingReservation[];
+
+  return {
+    success: true,
+    data: reservations,
+  };
+}
