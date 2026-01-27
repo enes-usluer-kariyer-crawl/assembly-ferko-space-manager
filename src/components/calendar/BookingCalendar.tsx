@@ -18,7 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Plus, Coffee, Repeat, Ban, Lock } from "lucide-react";
+import { Plus, Coffee, Repeat, Lock } from "lucide-react";
 
 const locales = {
   "tr": tr,
@@ -32,22 +32,20 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
-// Room colors for visual distinction
-const ROOM_COLORS: Record<string, { bg: string; border: string }> = {
-  "Büyük Oda": { bg: "#3b82f6", border: "#2563eb" },         // Blue
-  "Eğitim Odası": { bg: "#10b981", border: "#059669" },      // Green
-  "Demo Odası": { bg: "#f59e0b", border: "#d97706" },        // Amber
-  "Koltuklu Oda": { bg: "#8b5cf6", border: "#7c3aed" },      // Purple
-  "Masalı Oda": { bg: "#ef4444", border: "#dc2626" },        // Red
-};
-
-const DEFAULT_COLOR = { bg: "#6b7280", border: "#4b5563" };
+const resources = [
+  { id: 'Büyük Oda', title: 'Büyük Oda' },
+  { id: 'Demo Odası', title: 'Demo Odası' },
+  { id: 'Eğitim Odası', title: 'Eğitim Odası' },
+  { id: 'Koltuklu Oda', title: 'Koltuklu Oda' },
+  { id: 'Masalı Oda', title: 'Masalı Oda' }
+];
 
 type CalendarEvent = {
   id: string;
   title: string;
   start: Date;
   end: Date;
+  room: string;
   resource: {
     roomName: string;
     roomId: string;
@@ -60,7 +58,6 @@ type CalendarEvent = {
     userId?: string;
     userFullName?: string | null;
     userEmail?: string;
-    // For big_event_block: the name of the main event that caused the block
     blockedByEventName?: string;
   };
 };
@@ -69,11 +66,9 @@ type CalendarEvent = {
 function EventComponent({ event }: { event: CalendarEvent }) {
   const tags = event.resource.tags || [];
   const isBigEventBlock = tags.includes("big_event_block");
-  const isBigEvent = tags.includes("big_event");
 
   // Big Event Block: Minimal container with just an icon, tooltip shows details
   if (isBigEventBlock) {
-    // Extract the main event name from the description (format: "Blocked due to Big Event: [name]")
     const mainEventName = event.resource.blockedByEventName ||
       (event.resource.description?.replace("Blocked due to Big Event: ", "") ?? "Büyük Etkinlik");
 
@@ -91,46 +86,38 @@ function EventComponent({ event }: { event: CalendarEvent }) {
     );
   }
 
-  const displayTitle = event.title.replace(` (${event.resource.roomName})`, "");
-  const userName = event.resource.userName;
-
-  // Standard event content
-  const eventContent = (
-    <div className="relative flex flex-col gap-1 overflow-hidden h-full p-1">
-      {/* Title (bold) */}
-      <div className="flex items-center gap-1">
-        <span className="font-bold truncate text-sm pr-4">{displayTitle}</span>
-        {event.resource.isRecurring && (
-          <Repeat className="h-3 w-3 flex-shrink-0" />
-        )}
-      </div>
-      {/* User name (small) - only show if not a big event */}
-      {userName && !isBigEvent && (
-        <span className="text-xs opacity-75 truncate">{userName}</span>
-      )}
-      
-      {/* Catering Icon - Absolute Positioned */}
-      {event.resource.cateringRequested && (
-        <Coffee className="absolute bottom-1 right-1 h-4 w-4 text-foreground/70" />
-      )}
-    </div>
-  );
-
-  // Tooltip with full details
+  // Standard event content - Cleaned up
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="h-full w-full">{eventContent}</div>
+        <div className="h-full w-full p-1 overflow-hidden flex flex-col">
+          {/* Title (bold) */}
+          <div className="font-bold text-sm truncate">{event.title}</div>
+          {/* User name (small) */}
+          {event.resource.userName && (
+            <div className="text-xs opacity-90 truncate">{event.resource.userName}</div>
+          )}
+          
+          {/* Icons row */}
+          <div className="mt-auto flex items-center gap-1 justify-end opacity-80">
+            {event.resource.isRecurring && (
+              <Repeat className="h-3 w-3" />
+            )}
+            {event.resource.cateringRequested && (
+              <Coffee className="h-3 w-3" />
+            )}
+          </div>
+        </div>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-sm">
         <div className="space-y-1">
-          <div className="font-semibold">{displayTitle}</div>
+          <div className="font-semibold">{event.title}</div>
           <div className="text-sm">
             <span className="text-muted-foreground">Oda:</span> {event.resource.roomName}
           </div>
-          {userName && (
+          {event.resource.userName && (
             <div className="text-sm">
-              <span className="text-muted-foreground">Kişi:</span> {userName}
+              <span className="text-muted-foreground">Kişi:</span> {event.resource.userName}
             </div>
           )}
           {event.resource.description && (
@@ -182,9 +169,10 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
 
       return {
         id: reservation.id,
-        title: `${reservation.title} (${reservation.rooms.name})`,
+        title: reservation.title, // Clean title
         start: new Date(reservation.start_time),
         end: new Date(reservation.end_time),
+        room: reservation.rooms.name, // Link to resource
         resource: {
           roomName: reservation.rooms.name,
           roomId: reservation.room_id,
@@ -197,84 +185,55 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           userId: reservation.user_id,
           userFullName: reservation.profiles?.full_name,
           userEmail: reservation.profiles?.email,
+          blockedByEventName: undefined // Would need to parse or fetch if needed
         },
       };
     });
   }, [reservations]);
 
-  // Event style getter for color-coding by room and status
+  // Event style getter for color-coding by room
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
-    const colors = ROOM_COLORS[event.resource.roomName] || DEFAULT_COLOR;
-    const isPending = event.resource.status === "pending";
     const tags = event.resource.tags || [];
     const isBigEventBlock = tags.includes("big_event_block");
-    const isBigEvent = tags.includes("big_event");
 
     // Big Event Block: Solid light gray background, no border
     if (isBigEventBlock) {
       return {
         style: {
-          backgroundColor: "#f3f4f6", // Solid Light Gray
+          backgroundColor: "#f3f4f6",
           border: "none",
           opacity: 1,
           color: "#6b7280",
           borderRadius: "4px",
-          fontSize: "0.75rem",
-          fontWeight: 500,
           cursor: "default",
-          zIndex: 1, // Lower z-index so main Big Event appears on top
         },
       };
     }
 
-    // Main Big Event: Prominent styling
-    if (isBigEvent) {
-      return {
-        style: {
-          backgroundColor: "#7c2d12",
-          border: "3px solid #450a0a",
-          opacity: 1,
-          color: "#ffffff",
-          borderRadius: "6px",
-          fontSize: "0.875rem",
-          fontWeight: 700,
-          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.2)",
-          zIndex: 10,
-        },
-      };
+    let colorClass = "bg-gray-500";
+    switch (event.room) {
+      case 'Büyük Oda':
+        colorClass = "bg-blue-600";
+        break;
+      case 'Demo Odası':
+        colorClass = "bg-orange-500";
+        break;
+      case 'Eğitim Odası':
+        colorClass = "bg-emerald-600";
+        break;
+      case 'Koltuklu Oda':
+        colorClass = "bg-purple-600";
+        break;
+      case 'Masalı Oda':
+        colorClass = "bg-rose-600";
+        break;
     }
 
-    if (isPending) {
-      // Pending: Light orange/amber background with dashed border
-      return {
-        style: {
-          backgroundColor: "#fff7ed", // Light amber background
-          border: "2px dashed #f59e0b", // Dashed amber border
-          opacity: 0.85,
-          color: "#b45309", // Dark amber text
-          borderRadius: "6px",
-          fontSize: "0.875rem",
-          fontWeight: 500,
-          boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-        },
-      };
-    }
-
-    // Approved: Solid colors based on room
     return {
+      className: `${colorClass} text-white rounded-md border-none`,
       style: {
-        backgroundColor: `${colors.bg}15`, // Light background with 15% opacity
-        borderLeft: `4px solid ${colors.border}`, // Left border highlight
-        borderTop: "none",
-        borderRight: "none",
-        borderBottom: "none",
-        opacity: 1,
-        color: colors.border, // Text color matches border
-        borderRadius: "6px",
-        fontSize: "0.875rem",
-        fontWeight: 500,
-        boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-      },
+        opacity: event.resource.status === 'pending' ? 0.75 : 1 // Visual cue for pending
+      }
     };
   }, []);
 
@@ -284,6 +243,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
       router.push("/login?next=/");
       return;
     }
+    // Note: In resource view, slotInfo might contain resourceId if we wanted to pre-select the room
     setSelectedSlot({
       start: slotInfo.start,
       end: slotInfo.end,
@@ -329,125 +289,88 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
 
   return (
     <TooltipProvider delayDuration={200}>
-    <div className="h-full flex flex-col">
-      {/* Header with New Reservation button */}
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Rezervasyon Takvimi</h1>
-          <p className="text-sm text-muted-foreground">
-            Takvimde boş bir alana tıklayarak veya butona basarak yeni rezervasyon oluşturabilirsiniz
-          </p>
+      <div className="h-full flex flex-col">
+        {/* Header with New Reservation button */}
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Rezervasyon Takvimi</h1>
+            <p className="text-sm text-muted-foreground">
+              Takvimde boş bir alana tıklayarak veya butona basarak yeni rezervasyon oluşturabilirsiniz
+            </p>
+          </div>
+          <Button
+            onClick={handleNewReservation}
+            size="lg"
+            className="gap-2 px-6 py-3 text-base font-semibold shadow-md hover:shadow-lg transition-shadow"
+          >
+            <Plus className="h-5 w-5" />
+            Yeni Rezervasyon
+          </Button>
         </div>
-        <Button
-          onClick={handleNewReservation}
-          size="lg"
-          className="gap-2 px-6 py-3 text-base font-semibold shadow-md hover:shadow-lg transition-shadow"
-        >
-          <Plus className="h-5 w-5" />
-          Yeni Rezervasyon
-        </Button>
-      </div>
 
-      {/* Room legend */}
-      <div className="flex flex-wrap gap-3 mb-4 p-3 bg-muted/50 rounded-lg">
-        <span className="text-sm font-medium text-muted-foreground">Odalar:</span>
-        {rooms.map((room) => {
-          const colors = ROOM_COLORS[room.name] || DEFAULT_COLOR;
-          return (
-            <div key={room.id} className="flex items-center gap-2">
-              <div
-                className="w-4 h-4 rounded"
-                style={{ backgroundColor: colors.bg }}
-              />
-              <span className="text-sm">{room.name}</span>
-            </div>
-          );
-        })}
-        <div className="ml-4 border-l pl-4 flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-4 h-4 rounded"
-              style={{ border: "2px dashed #f59e0b", backgroundColor: "#fff7ed" }}
-            />
-            <span className="text-sm text-muted-foreground">Onay Bekliyor</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="w-4 h-4 rounded"
-              style={{ borderLeft: "4px solid #3b82f6", backgroundColor: "#3b82f615" }}
-            />
-            <span className="text-sm text-muted-foreground">Onaylandı</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="w-4 h-4 rounded flex items-center justify-center bg-[#f3f4f6]"
-            >
-              <Lock className="h-3 w-3 text-muted-foreground opacity-50" />
-            </div>
-            <span className="text-sm text-muted-foreground">Ofis Kapalı</span>
-          </div>
+        {/* Calendar */}
+        <div className="flex-1 bg-background rounded-lg border" style={{ height: 'calc(100vh - 150px)' }}>
+          <Calendar
+            localizer={localizer}
+            events={events}
+            startAccessor="start"
+            endAccessor="end"
+            date={currentDate}
+            onNavigate={handleNavigate}
+            defaultView={Views.DAY}
+            views={[Views.MONTH, Views.WEEK, Views.DAY]}
+            selectable
+            onSelectSlot={handleSelectSlot}
+            onSelectEvent={handleSelectEvent}
+            eventPropGetter={eventStyleGetter}
+            min={new Date(0, 0, 0, 8, 0, 0)}
+            max={new Date(0, 0, 0, 22, 0, 0)}
+            step={30}
+            timeslots={2}
+            culture="tr"
+            resources={resources}
+            resourceIdAccessor="id"
+            resourceTitleAccessor="title"
+            resourceAccessor="room"
+            messages={{
+              today: "Bugün",
+              previous: "Geri",
+              next: "İleri",
+              month: "Ay",
+              week: "Hafta",
+              day: "Gün",
+              agenda: "Ajanda",
+              noEventsInRange: "Bu aralıkta rezervasyon bulunmuyor.",
+              showMore: (count) => `+${count} daha`,
+            }}
+            components={{
+              toolbar: CalendarToolbar,
+              event: EventComponent,
+            }}
+            style={{ height: "100%" }}
+          />
         </div>
-      </div>
 
-      {/* Calendar */}
-      <div className="flex-1 bg-background rounded-lg border" style={{ height: 'calc(100vh - 150px)' }}>
-        <Calendar
-          localizer={localizer}
-          events={events}
-          startAccessor="start"
-          endAccessor="end"
-          date={currentDate}
-          onNavigate={handleNavigate}
-          defaultView={Views.WEEK}
-          views={[Views.MONTH, Views.WEEK, Views.DAY]}
-          selectable
-          onSelectSlot={handleSelectSlot}
-          onSelectEvent={handleSelectEvent}
-          eventPropGetter={eventStyleGetter}
-          min={new Date(0, 0, 0, 8, 0, 0)}
-          max={new Date(0, 0, 0, 22, 0, 0)}
-          step={30}
-          timeslots={2}
-          culture="tr"
-          messages={{
-            today: "Bugün",
-            previous: "Geri",
-            next: "İleri",
-            month: "Ay",
-            week: "Hafta",
-            day: "Gün",
-            agenda: "Ajanda",
-            noEventsInRange: "Bu aralıkta rezervasyon bulunmuyor.",
-            showMore: (count) => `+${count} daha`,
-          }}
-          components={{
-            toolbar: CalendarToolbar,
-            event: EventComponent,
-          }}
-          style={{ height: "100%" }}
+        {/* New Reservation Dialog */}
+        <NewReservationDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          rooms={rooms}
+          initialStartTime={selectedSlot?.start}
+          initialEndTime={selectedSlot?.end}
+          onSuccess={handleReservationCreated}
+        />
+
+        {/* Reservation Detail Dialog */}
+        <ReservationDetailDialog
+          open={detailDialogOpen}
+          onOpenChange={setDetailDialogOpen}
+          event={selectedEvent}
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          onCancelled={onRefresh}
         />
       </div>
-
-      {/* New Reservation Dialog */}
-      <NewReservationDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        rooms={rooms}
-        initialStartTime={selectedSlot?.start}
-        initialEndTime={selectedSlot?.end}
-        onSuccess={handleReservationCreated}
-      />
-
-      {/* Reservation Detail Dialog */}
-      <ReservationDetailDialog
-        open={detailDialogOpen}
-        onOpenChange={setDetailDialogOpen}
-        event={selectedEvent}
-        currentUserId={currentUserId}
-        isAdmin={isAdmin}
-        onCancelled={onRefresh}
-      />
-    </div>
     </TooltipProvider>
   );
 }
