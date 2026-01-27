@@ -239,12 +239,22 @@ export async function createReservation(
   }
 
   // Prevent booking in the past or same day (must be at least tomorrow)
+  // Use Europe/Istanbul timezone to determine "Today" and "Tomorrow"
   const now = new Date();
-  const tomorrowMidnight = new Date(now);
-  tomorrowMidnight.setDate(tomorrowMidnight.getDate() + 1);
-  tomorrowMidnight.setHours(0, 0, 0, 0);
+  
+  // Format dates as YYYY-MM-DD in Istanbul time
+  const dateFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
 
-  if (start < tomorrowMidnight) {
+  const todayIstanbul = dateFormatter.format(now);
+  const bookingDateIstanbul = dateFormatter.format(start);
+
+  // Booking date must be strictly after today (future date)
+  if (bookingDateIstanbul <= todayIstanbul) {
     return {
       success: false,
       error: "Rezervasyonlar en az 1 gün önceden yapılmalıdır.",

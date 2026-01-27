@@ -106,7 +106,7 @@ export function NewReservationDialog({
   const calculateMinDate = () => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    return d.toISOString().split("T")[0];
+    return format(d, "yyyy-MM-dd");
   };
   const minDateStr = calculateMinDate();
 
