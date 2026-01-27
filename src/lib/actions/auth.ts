@@ -9,80 +9,41 @@ export type AuthState = {
   success?: boolean;
 } | undefined;
 
-const ALLOWED_DOMAINS = ['kariyer.net', 'techcareer.net', 'coens.io'];
-const ADMIN_WHITELIST = ['eusluer.eu@gmail.com'];
+const ALLOWED_DOMAINS = ['kariyer.net', 'techcareer.net', 'coens.io', 'eusluer.eu'];
 
 function validateEmailDomain(email: string): { valid: boolean; error?: string } {
   const domain = email.split('@')[1]?.toLowerCase();
 
-  if (ADMIN_WHITELIST.includes(email.toLowerCase())) {
-    return { valid: true };
-  }
-
   if (!domain || !ALLOWED_DOMAINS.includes(domain)) {
     return {
       valid: false,
-      error: "Sadece onaylı kurumsal mailler veya yönetici hesabı giriş yapabilir."
+      error: "Sadece onaylı kurumsal mailler giriş yapabilir."
     };
   }
 
   return { valid: true };
 }
 
-export async function login(prevState: AuthState, formData: FormData) {
+export async function loginWithMagicLink(prevState: AuthState, formData: FormData) {
   const supabase = await createClient();
 
   const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const next = (formData.get("next") as string) || "/";
 
   const validation = validateEmailDomain(email);
   if (!validation.valid) {
     return { error: validation.error };
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { error } = await supabase.auth.signInWithOtp({
     email,
-    password,
+    options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      shouldCreateUser: true,
+    },
   });
 
   if (error) {
     return { error: error.message };
-  }
-
-  revalidatePath("/", "layout");
-  redirect(next);
-}
-
-export async function signup(prevState: AuthState, formData: FormData) {
-  const supabase = await createClient();
-
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const full_name = formData.get("full_name") as string;
-
-  const validation = validateEmailDomain(email);
-  if (!validation.valid) {
-    return { error: validation.error };
-  }
-
-  console.log(`Signup started for email: ${email}`);
-
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name,
-      },
-    },
-  });
-
-  console.log("Supabase signUp result:", { data, error });
-
-  if (error) {
-    console.error("SUPABASE ERROR:", error);
-    return { error: error.message || "Database error saving new user" };
   }
 
   return { success: true, error: null };

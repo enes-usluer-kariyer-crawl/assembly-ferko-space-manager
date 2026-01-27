@@ -2,15 +2,12 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { login } from "@/lib/actions/auth";
+import { loginWithMagicLink } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -28,7 +25,7 @@ const DOMAIN_OPTIONS = [
   { value: "@kariyer.net", label: "@kariyer.net" },
   { value: "@techcareer.net", label: "@techcareer.net" },
   { value: "@coens.io", label: "@coens.io" },
-  { value: "other", label: "Diğer" },
+  { value: "@eusluer.eu", label: "@eusluer.eu" },
 ];
 
 function SubmitButton() {
@@ -36,22 +33,19 @@ function SubmitButton() {
 
   return (
     <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Giriş yapılıyor..." : "Giriş Yap"}
+      {pending ? "Gönderiliyor..." : "Giriş Linki Gönder"}
     </Button>
   );
 }
 
 export default function LoginPage() {
-  const searchParams = useSearchParams();
-  const nextUrl = searchParams.get("next") || "/";
-  const [state, formAction] = useActionState(login, undefined);
+  const [state, formAction] = useActionState(loginWithMagicLink, undefined);
   const [selectedDomain, setSelectedDomain] = useState<string>("@kariyer.net");
-  const [customDomain, setCustomDomain] = useState<string>("");
   const [emailError, setEmailError] = useState<string | null>(null);
 
   const handleSubmit = (formData: FormData) => {
     const username = formData.get("username") as string;
-    const domain = selectedDomain === "other" ? customDomain : selectedDomain;
+    const domain = selectedDomain;
     const email = username + domain;
 
     if (!username.trim()) {
@@ -59,17 +53,10 @@ export default function LoginPage() {
       return;
     }
 
-    if (selectedDomain === "other" && !customDomain.startsWith("@")) {
-      setEmailError("Domain '@' ile başlamalıdır.");
-      return;
-    }
-
     setEmailError(null);
 
     const newFormData = new FormData();
     newFormData.set("email", email);
-    newFormData.set("password", formData.get("password") as string);
-    newFormData.set("next", formData.get("next") as string);
 
     formAction(newFormData);
   };
@@ -82,87 +69,60 @@ export default function LoginPage() {
             Hoş Geldiniz
           </CardTitle>
           <CardDescription className="text-center">
-            Devam etmek için giriş yapın
+            E-posta adresinizi girin, size giriş linki gönderelim
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={handleSubmit} className="space-y-4">
-            <input type="hidden" name="next" value={nextUrl} />
-            <div className="space-y-2">
-              <Label htmlFor="username">Email</Label>
-              <div className="flex gap-1">
-                <Input
-                  id="username"
-                  name="username"
-                  type="text"
-                  placeholder="ad.soyad"
-                  className="flex-1"
-                  required
-                />
-                <Select
-                  value={selectedDomain}
-                  onValueChange={setSelectedDomain}
-                >
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Domain seçin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DOMAIN_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          {state?.success ? (
+            <div className="text-center py-4">
+              <div className="text-green-600 font-medium mb-2">
+                Giriş linki e-posta adresinize gönderildi.
               </div>
-              {selectedDomain === "other" && (
-                <Input
-                  type="text"
-                  placeholder="@domain.com"
-                  value={customDomain}
-                  onChange={(e) => setCustomDomain(e.target.value)}
-                  className="mt-2"
-                />
+              <div className="text-sm text-muted-foreground">
+                Lütfen kutunuzu kontrol edin.
+              </div>
+            </div>
+          ) : (
+            <form action={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">Email</Label>
+                <div className="flex gap-1">
+                  <Input
+                    id="username"
+                    name="username"
+                    type="text"
+                    placeholder="ad.soyad"
+                    className="flex-1"
+                    required
+                  />
+                  <Select
+                    value={selectedDomain}
+                    onValueChange={setSelectedDomain}
+                  >
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Domain seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DOMAIN_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {(state?.error || emailError) && (
+                <div className="text-sm text-red-500 font-medium">
+                  {emailError || state?.error}
+                </div>
               )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Şifre</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-              />
-            </div>
-            {(state?.error || emailError) && (
-              <div className="text-sm text-red-500 font-medium">
-                {emailError || state?.error}
+              <div className="pt-2">
+                <SubmitButton />
               </div>
-            )}
-            <div className="pt-2">
-              <SubmitButton />
-            </div>
-          </form>
+            </form>
+          )}
         </CardContent>
-        <CardFooter className="flex flex-col gap-2">
-          <div className="relative w-full">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                veya
-              </span>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            className="w-full mt-2"
-            asChild
-          >
-            <Link href="/signup">Kayıt Ol</Link>
-          </Button>
-        </CardFooter>
       </Card>
     </div>
   );
