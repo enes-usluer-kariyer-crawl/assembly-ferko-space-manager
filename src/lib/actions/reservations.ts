@@ -238,11 +238,16 @@ export async function createReservation(
     };
   }
 
-  // Prevent booking in the past
-  if (start < new Date()) {
+  // Prevent booking in the past or same day (must be at least tomorrow)
+  const now = new Date();
+  const tomorrowMidnight = new Date(now);
+  tomorrowMidnight.setDate(tomorrowMidnight.getDate() + 1);
+  tomorrowMidnight.setHours(0, 0, 0, 0);
+
+  if (start < tomorrowMidnight) {
     return {
       success: false,
-      error: "Geçmişe rezervasyon yapılamaz.",
+      error: "Rezervasyonlar en az 1 gün önceden yapılmalıdır.",
     };
   }
 

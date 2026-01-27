@@ -102,16 +102,13 @@ export function NewReservationDialog({
   const [recurrencePattern, setRecurrencePattern] = useState<"none" | "weekly">("none");
   const [attendeeCount, setAttendeeCount] = useState<string>("");
 
-  // Get today's date in YYYY-MM-DD format for min date validation
-  const today = new Date().toISOString().split("T")[0];
-
-  // Get current time for min time validation when date is today
-  const getCurrentMinTime = () => {
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, "0");
-    const minutes = now.getMinutes().toString().padStart(2, "0");
-    return `${hours}:${minutes}`;
+  // Get tomorrow's date in YYYY-MM-DD format for min date validation
+  const calculateMinDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
   };
+  const minDateStr = calculateMinDate();
 
   // Reset form when dialog opens/closes or initial times change
   useEffect(() => {
@@ -384,7 +381,7 @@ export function NewReservationDialog({
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  min={today}
+                  min={minDateStr}
                 />
               </div>
               <div className="space-y-2">
@@ -395,7 +392,6 @@ export function NewReservationDialog({
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  min={startDate === today ? getCurrentMinTime() : undefined}
                 />
               </div>
 
@@ -407,7 +403,7 @@ export function NewReservationDialog({
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  min={startDate || today}
+                  min={startDate || minDateStr}
                 />
               </div>
               <div className="space-y-2">
@@ -418,10 +414,12 @@ export function NewReservationDialog({
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  min={endDate === today ? getCurrentMinTime() : undefined}
                 />
               </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Hazırlık süreçleri nedeniyle en erken yarına rezervasyon oluşturabilirsiniz.
+            </p>
 
             {/* Tags multi-select (for big events) */}
             <div className="space-y-2">
