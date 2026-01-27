@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkAvailability } from "./availability";
+import { ROOM_CAPACITIES } from "@/constants/rooms";
 
 // Big Event tags that trigger global room lockout
 const BIG_EVENT_TAGS = [
@@ -179,6 +180,7 @@ export type CreateReservationInput = {
   tags?: string[];
   cateringRequested?: boolean;
   recurrencePattern?: "none" | "weekly";
+  attendeeCount?: number;
 };
 
 export type ConflictingReservation = {
@@ -203,7 +205,7 @@ export type CreateReservationResult = {
 export async function createReservation(
   input: CreateReservationInput
 ): Promise<CreateReservationResult> {
-  const { roomId, title, description, startTime, endTime, tags, cateringRequested, recurrencePattern } =
+  const { roomId, title, description, startTime, endTime, tags, cateringRequested, recurrencePattern, attendeeCount } =
     input;
 
   // Validate required fields
@@ -247,10 +249,10 @@ export async function createReservation(
     };
   }
 
-  // Validate room exists
+  // Validate room exists and get capacity
   const { data: room, error: roomError } = await supabase
     .from("rooms")
-    .select("id, is_active")
+    .select("id, name, capacity, is_active")
     .eq("id", roomId)
     .single();
 
@@ -266,6 +268,17 @@ export async function createReservation(
       success: false,
       error: "The selected room is not available for booking.",
     };
+  }
+
+  // Validate attendee count against room capacity
+  if (attendeeCount && attendeeCount > 0) {
+    const roomCapacity = ROOM_CAPACITIES[room.name] ?? room.capacity;
+    if (attendeeCount > roomCapacity) {
+      return {
+        success: false,
+        error: `Katılımcı sayısı (${attendeeCount}) odanın kapasitesini (${roomCapacity}) aşıyor. Lütfen daha büyük bir oda seçin.`,
+      };
+    }
   }
 
   // Check availability using the existing availability check

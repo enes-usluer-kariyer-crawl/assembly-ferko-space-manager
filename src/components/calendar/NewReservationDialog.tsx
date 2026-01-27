@@ -27,6 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import type { Room } from "@/lib/actions/reservations";
 import { createReservation } from "@/lib/actions/reservations";
+import { ROOM_CAPACITIES } from "@/constants/rooms";
 
 type NewReservationDialogProps = {
   open: boolean;
@@ -44,11 +45,11 @@ const BIG_EVENT_TAGS = [
   "ÖM- HR Small Talks",
 ];
 
-function SubmitButton() {
+function SubmitButton({ disabled }: { disabled?: boolean }) {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" disabled={pending || disabled}>
       {pending ? "Oluşturuluyor..." : "Rezervasyon Oluştur"}
     </Button>
   );
@@ -95,6 +96,7 @@ export function NewReservationDialog({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [cateringRequested, setCateringRequested] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState<"none" | "weekly">("none");
+  const [attendeeCount, setAttendeeCount] = useState<string>("");
 
   // Reset form when dialog opens/closes or initial times change
   useEffect(() => {
@@ -106,6 +108,7 @@ export function NewReservationDialog({
       setSelectedTags([]);
       setCateringRequested(false);
       setRecurrencePattern("none");
+      setAttendeeCount("");
 
       if (initialStartTime) {
         setStartDate(format(initialStartTime, "yyyy-MM-dd"));
@@ -133,6 +136,14 @@ export function NewReservationDialog({
     );
   };
 
+  // Get selected room and its capacity
+  const selectedRoom = rooms.find((r) => r.id === roomId);
+  const roomCapacity = selectedRoom ? ROOM_CAPACITIES[selectedRoom.name] ?? selectedRoom.capacity : null;
+
+  // Check if attendee count exceeds capacity
+  const attendeeCountNum = attendeeCount ? parseInt(attendeeCount, 10) : 0;
+  const exceedsCapacity = roomCapacity !== null && attendeeCountNum > roomCapacity;
+
   const handleFormAction = async (formData: FormData) => {
     setError(null);
 
@@ -144,6 +155,7 @@ export function NewReservationDialog({
     const formEndDate = formData.get("endDate") as string;
     const formEndTime = formData.get("endTime") as string;
     const formDescription = formData.get("description") as string;
+    const formAttendeeCount = formData.get("attendeeCount") as string;
 
     if (!formTitle?.trim()) {
       setError("Lütfen bir başlık girin.");
@@ -158,6 +170,17 @@ export function NewReservationDialog({
     if (!formStartDate || !formStartTime || !formEndDate || !formEndTime) {
       setError("Lütfen başlangıç ve bitiş tarih/saatini girin.");
       return;
+    }
+
+    // Validate attendee count against room capacity
+    const attendeeNum = formAttendeeCount ? parseInt(formAttendeeCount, 10) : 0;
+    const room = rooms.find((r) => r.id === formRoomId);
+    if (room && attendeeNum > 0) {
+      const capacity = ROOM_CAPACITIES[room.name] ?? room.capacity;
+      if (attendeeNum > capacity) {
+        setError(`Katılımcı sayısı (${attendeeNum}) odanın kapasitesini (${capacity}) aşıyor.`);
+        return;
+      }
     }
 
     // Construct Date objects from local inputs to handle timezone correctly
@@ -184,6 +207,7 @@ export function NewReservationDialog({
         tags: selectedTags,
         cateringRequested,
         recurrencePattern,
+        attendeeCount: attendeeNum > 0 ? attendeeNum : undefined,
       });
 
       if (!result.success) {
@@ -245,11 +269,30 @@ export function NewReservationDialog({
                 <SelectContent>
                   {rooms.map((room) => (
                     <SelectItem key={room.id} value={room.id}>
-                      {room.name} (Kapasite: {room.capacity})
+                      {room.name} (Kapasite: {ROOM_CAPACITIES[room.name] ?? room.capacity})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Attendee count */}
+            <div className="space-y-2">
+              <Label htmlFor="attendeeCount">Katılımcı Sayısı</Label>
+              <Input
+                id="attendeeCount"
+                name="attendeeCount"
+                type="number"
+                min="1"
+                value={attendeeCount}
+                onChange={(e) => setAttendeeCount(e.target.value)}
+                placeholder="Katılımcı sayısını girin"
+              />
+              {exceedsCapacity && (
+                <div className="p-3 text-sm text-yellow-800 bg-yellow-100 border border-yellow-300 rounded-md">
+                  Bu odanın kapasitesi {roomCapacity} kişidir. Lütfen daha büyük bir oda seçin.
+                </div>
+              )}
             </div>
 
             {/* Date and Time Grid */}
@@ -369,7 +412,7 @@ export function NewReservationDialog({
 
           <DialogFooter className="mt-4">
             <CancelButton onCancel={() => onOpenChange(false)} />
-            <SubmitButton />
+            <SubmitButton disabled={exceedsCapacity} />
           </DialogFooter>
         </form>
       </DialogContent>
