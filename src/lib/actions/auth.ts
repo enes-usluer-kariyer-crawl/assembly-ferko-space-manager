@@ -36,6 +36,22 @@ export async function loginWithMagicLink(prevState: AuthState, formData: FormDat
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
+  try {
+    const { data: isAllowed, error: rateLimitError } = await supabase.rpc('check_and_update_rate_limit', {
+      p_email: email
+    });
+
+    if (rateLimitError) {
+      console.error("Rate limit check failed:", rateLimitError);
+      // If the function doesn't exist (migration not run), we probably shouldn't block login,
+      // but for this task we assume migration is part of the deliverable.
+    } else if (isAllowed === false) {
+      return { error: "Lütfen yeni bir kod istemeden önce 2 dakika bekleyin." };
+    }
+  } catch (err) {
+    console.error("Unexpected error during rate limit check:", err);
+  }
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
