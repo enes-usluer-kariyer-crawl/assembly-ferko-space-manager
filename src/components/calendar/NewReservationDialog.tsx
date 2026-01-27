@@ -158,15 +158,19 @@ export function NewReservationDialog({
       return;
     }
 
-    // Construct ISO datetime strings
-    const startDateTime = `${formStartDate}T${formStartTime}:00`;
-    const endDateTime = `${formEndDate}T${formEndTime}:00`;
+    // Construct Date objects from local inputs to handle timezone correctly
+    const startLocal = new Date(`${formStartDate}T${formStartTime}:00`);
+    const endLocal = new Date(`${formEndDate}T${formEndTime}:00`);
 
     // Validate times
-    if (new Date(endDateTime) <= new Date(startDateTime)) {
+    if (endLocal <= startLocal) {
       setError("Bitiş zamanı başlangıç zamanından sonra olmalıdır.");
       return;
     }
+
+    // Convert to ISO string (UTC) so server receives the correct absolute time
+    const startDateTime = startLocal.toISOString();
+    const endDateTime = endLocal.toISOString();
 
     try {
       const result = await createReservation({
