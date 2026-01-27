@@ -72,14 +72,14 @@ function EventComponent({ event }: { event: CalendarEvent }) {
             <div className="text-[10px] opacity-90 truncate">{event.resource.userName}</div>
           )}
           
-          {/* Icons row */}
-          {!isShort && (
-            <div className="mt-auto flex items-center gap-1 justify-end opacity-80">
+          {/* Icons row - show for all events, smaller for short ones */}
+          {(event.resource.isRecurring || event.resource.cateringRequested) && (
+            <div className={`${isShort ? '' : 'mt-auto'} flex items-center gap-0.5 justify-end opacity-80`}>
               {event.resource.isRecurring && (
-                <Repeat className="h-3 w-3" />
+                <Repeat className={isShort ? "h-2.5 w-2.5" : "h-3 w-3"} />
               )}
               {event.resource.cateringRequested && (
-                <Coffee className="h-3 w-3" />
+                <Coffee className={isShort ? "h-2.5 w-2.5" : "h-3 w-3"} />
               )}
             </div>
           )}
