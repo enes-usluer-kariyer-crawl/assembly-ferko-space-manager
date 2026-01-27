@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Clock, MapPin, FileText, Coffee, Repeat, X } from "lucide-react";
+import { Clock, MapPin, FileText, Coffee, Repeat, X, User } from "lucide-react";
 import { cancelReservation } from "@/lib/actions/reservations";
 import { toast } from "sonner";
 

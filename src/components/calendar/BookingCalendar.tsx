@@ -58,6 +58,8 @@ type CalendarEvent = {
     isRecurring?: boolean;
     userName?: string;
     userId?: string;
+    userFullName?: string | null;
+    userEmail?: string;
     // For big_event_block: the name of the main event that caused the block
     blockedByEventName?: string;
   };
@@ -192,6 +194,8 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           isRecurring: reservation.is_recurring,
           userName,
           userId: reservation.user_id,
+          userFullName: reservation.profiles?.full_name,
+          userEmail: reservation.profiles?.email,
         },
       };
     });
