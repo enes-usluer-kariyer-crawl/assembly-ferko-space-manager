@@ -32,14 +32,6 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
-const resources = [
-  { id: 'Büyük Oda', title: 'Büyük Oda' },
-  { id: 'Demo Odası', title: 'Demo Odası' },
-  { id: 'Eğitim Odası', title: 'Eğitim Odası' },
-  { id: 'Koltuklu Oda', title: 'Koltuklu Oda' },
-  { id: 'Masalı Oda', title: 'Masalı Oda' }
-];
-
 type CalendarEvent = {
   id: string;
   title: string;
@@ -216,7 +208,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
         colorClass = "bg-blue-600";
         break;
       case 'Demo Odası':
-        colorClass = "bg-orange-500";
+        colorClass = "bg-amber-500";
         break;
       case 'Eğitim Odası':
         colorClass = "bg-emerald-600";
@@ -229,10 +221,13 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
         break;
     }
 
+    const isPending = event.resource.status === 'pending';
+
     return {
       className: `${colorClass} text-white rounded-md border-none`,
       style: {
-        opacity: event.resource.status === 'pending' ? 0.75 : 1 // Visual cue for pending
+        opacity: isPending ? 0.75 : 1, // Visual cue for pending
+        border: isPending ? "2px dashed rgba(255,255,255,0.6)" : "none",
       }
     };
   }, []);
@@ -308,8 +303,32 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           </Button>
         </div>
 
+        {/* Legend */}
+        <div className="flex flex-wrap gap-4 mb-4 px-1">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-blue-600"></div>
+            <span className="text-sm text-muted-foreground">Büyük Oda</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-amber-500"></div>
+            <span className="text-sm text-muted-foreground">Demo Odası</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-emerald-600"></div>
+            <span className="text-sm text-muted-foreground">Eğitim Odası</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-purple-600"></div>
+            <span className="text-sm text-muted-foreground">Koltuklu Oda</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-rose-600"></div>
+            <span className="text-sm text-muted-foreground">Masalı Oda</span>
+          </div>
+        </div>
+
         {/* Calendar */}
-        <div className="flex-1 bg-background rounded-lg border" style={{ height: 'calc(100vh - 150px)' }}>
+        <div className="flex-1 bg-background rounded-lg border" style={{ height: 'calc(100vh - 180px)' }}>
           <Calendar
             localizer={localizer}
             events={events}
@@ -317,7 +336,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
             endAccessor="end"
             date={currentDate}
             onNavigate={handleNavigate}
-            defaultView={Views.DAY}
+            defaultView={Views.WEEK}
             views={[Views.MONTH, Views.WEEK, Views.DAY]}
             selectable
             onSelectSlot={handleSelectSlot}
@@ -328,10 +347,6 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
             step={30}
             timeslots={2}
             culture="tr"
-            resources={resources}
-            resourceIdAccessor="id"
-            resourceTitleAccessor="title"
-            resourceAccessor="room"
             messages={{
               today: "Bugün",
               previous: "Geri",
