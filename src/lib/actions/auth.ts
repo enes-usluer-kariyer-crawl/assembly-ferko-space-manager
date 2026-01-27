@@ -34,10 +34,12 @@ export async function loginWithMagicLink(prevState: AuthState, formData: FormDat
     return { error: validation.error };
   }
 
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      emailRedirectTo: `${origin}/auth/callback`,
       shouldCreateUser: true,
     },
   });
