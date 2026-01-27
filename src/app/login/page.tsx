@@ -25,7 +25,6 @@ const DOMAIN_OPTIONS = [
   { value: "@kariyer.net", label: "@kariyer.net" },
   { value: "@techcareer.net", label: "@techcareer.net" },
   { value: "@coens.io", label: "@coens.io" },
-  { value: "@eusluer.eu", label: "@eusluer.eu" },
 ];
 
 function SubmitButton() {

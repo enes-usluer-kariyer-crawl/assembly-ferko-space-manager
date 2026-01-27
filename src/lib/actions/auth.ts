@@ -9,7 +9,7 @@ export type AuthState = {
   success?: boolean;
 } | undefined;
 
-const ALLOWED_DOMAINS = ['kariyer.net', 'techcareer.net', 'coens.io', 'eusluer.eu'];
+const ALLOWED_DOMAINS = ['kariyer.net', 'techcareer.net', 'coens.io'];
 
 function validateEmailDomain(email: string): { valid: boolean; error?: string } {
   const domain = email.split('@')[1]?.toLowerCase();
