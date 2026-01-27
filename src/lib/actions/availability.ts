@@ -178,7 +178,7 @@ export async function checkAvailability({
 
     return {
       available: false,
-      reason: `This room is already booked during this time slot: "${conflictingReservation?.title ?? "Unknown reservation"}".`,
+      reason: "Seçilen saat aralığında bu oda dolu.",
       conflictingRoomId: roomId,
       conflictingReservationId: conflictingReservation?.id,
     };

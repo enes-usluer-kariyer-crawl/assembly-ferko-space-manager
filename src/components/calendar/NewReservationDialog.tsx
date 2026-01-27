@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -180,14 +181,20 @@ export function NewReservationDialog({
       });
 
       if (!result.success) {
-        setError(result.error || "Rezervasyon oluşturulamadı.");
+        const errorMessage = result.error || "Rezervasyon oluşturulamadı.";
+        setError(errorMessage);
+        // Show toast for conflict errors (red alert)
+        toast.error(errorMessage);
+        // Do NOT close the modal - user can pick a new time
         return;
       }
 
       onSuccess();
     } catch (err) {
       console.error("Error creating reservation:", err);
-      setError("Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.");
+      const errorMessage = "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.";
+      setError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
