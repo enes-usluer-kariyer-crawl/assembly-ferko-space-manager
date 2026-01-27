@@ -1,13 +1,18 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getReservations, getRooms } from "@/lib/actions/reservations";
 import { createClient } from "@/lib/supabase/server";
 import { CalendarPage } from "./CalendarPage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DoorOpen, CalendarDays, Zap, Info } from "lucide-react";
+import { DoorOpen, CalendarDays, Zap } from "lucide-react";
 
 export default async function Home() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+
+  // SECURITY: Redirect unauthenticated users to login
+  if (!user) {
+    redirect("/login");
+  }
 
   const [reservationsResult, roomsResult] = await Promise.all([
     getReservations(),
@@ -30,24 +35,6 @@ export default async function Home() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Auth Banner for non-authenticated users */}
-      {!user && (
-        <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <Info className="h-5 w-5 text-blue-600 flex-shrink-0" />
-          <p className="text-sm text-blue-800">
-            Rezervasyon oluşturmak için lütfen{" "}
-            <Link href="/login" className="font-semibold underline hover:no-underline">
-              giriş yapın
-            </Link>{" "}
-            veya{" "}
-            <Link href="/signup" className="font-semibold underline hover:no-underline">
-              hesap oluşturun
-            </Link>
-            .
-          </p>
-        </div>
-      )}
-
       {/* Stats Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Card 1: Available Rooms */}

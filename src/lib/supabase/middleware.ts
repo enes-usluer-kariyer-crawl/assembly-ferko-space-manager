@@ -37,10 +37,12 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // SECURITY: Protect all routes except login/signup for unauthenticated users
   if (
     !user &&
-    (request.nextUrl.pathname.startsWith("/reservations") ||
-      request.nextUrl.pathname.startsWith("/admin"))
+    !request.nextUrl.pathname.startsWith("/login") &&
+    !request.nextUrl.pathname.startsWith("/signup") &&
+    !request.nextUrl.pathname.startsWith("/auth")
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
