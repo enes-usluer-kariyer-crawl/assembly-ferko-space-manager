@@ -8,9 +8,11 @@ type CalendarPageProps = {
   initialReservations: Reservation[];
   rooms: Room[];
   isAuthenticated: boolean;
+  currentUserId?: string;
+  isAdmin?: boolean;
 };
 
-export function CalendarPage({ initialReservations, rooms, isAuthenticated }: CalendarPageProps) {
+export function CalendarPage({ initialReservations, rooms, isAuthenticated, currentUserId, isAdmin }: CalendarPageProps) {
   const [reservations, setReservations] = useState<Reservation[]>(initialReservations);
 
   const handleRefresh = useCallback(async () => {
@@ -26,6 +28,8 @@ export function CalendarPage({ initialReservations, rooms, isAuthenticated }: Ca
       rooms={rooms}
       onRefresh={handleRefresh}
       isAuthenticated={isAuthenticated}
+      currentUserId={currentUserId}
+      isAdmin={isAdmin}
     />
   );
 }

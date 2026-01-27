@@ -620,3 +620,106 @@ export async function getPendingReservations(): Promise<{
     data: reservations,
   };
 }
+
+export type CancelReservationResult = {
+  success: boolean;
+  message?: string;
+};
+
+export async function cancelReservation(
+  reservationId: string
+): Promise<CancelReservationResult> {
+  if (!reservationId) {
+    return {
+      success: false,
+      message: "Rezervasyon ID gereklidir.",
+    };
+  }
+
+  const supabase = await createClient();
+
+  // Get current user
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return {
+      success: false,
+      message: "Bu işlem için giriş yapmanız gerekiyor.",
+    };
+  }
+
+  // Fetch the reservation to get the owner
+  const { data: reservation, error: reservationError } = await supabase
+    .from("reservations")
+    .select("id, user_id, status")
+    .eq("id", reservationId)
+    .single();
+
+  if (reservationError || !reservation) {
+    return {
+      success: false,
+      message: "Rezervasyon bulunamadı.",
+    };
+  }
+
+  // Check if already cancelled
+  if (reservation.status === "cancelled") {
+    return {
+      success: false,
+      message: "Bu rezervasyon zaten iptal edilmiş.",
+    };
+  }
+
+  // Get user's role to check admin status
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile) {
+    return {
+      success: false,
+      message: "Kullanıcı profili alınamadı.",
+    };
+  }
+
+  // Authorization check
+  const isOwner = reservation.user_id === user.id;
+  const isAdmin = profile.role === "admin";
+
+  if (!isOwner && !isAdmin) {
+    return {
+      success: false,
+      message: "Bunu yapmaya yetkiniz yok.",
+    };
+  }
+
+  // Update the reservation status to cancelled
+  const { error: updateError } = await supabase
+    .from("reservations")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("id", reservationId);
+
+  if (updateError) {
+    console.error("Error cancelling reservation:", updateError);
+    return {
+      success: false,
+      message: "Rezervasyon iptal edilirken bir hata oluştu.",
+    };
+  }
+
+  // Revalidate paths to refresh data
+  revalidatePath("/");
+  revalidatePath("/admin/approvals");
+  revalidatePath("/reservations");
+  revalidatePath("/calendar");
+
+  return {
+    success: true,
+    message: "Rezervasyon başarıyla iptal edildi.",
+  };
+}

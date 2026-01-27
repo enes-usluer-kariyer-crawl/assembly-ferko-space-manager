@@ -14,6 +14,15 @@ export default async function Home() {
     redirect("/login");
   }
 
+  // Get user's admin status
+  let isAdmin = false;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  isAdmin = profile?.role === "admin";
+
   const [reservationsResult, roomsResult] = await Promise.all([
     getReservations(),
     getRooms(),
@@ -90,7 +99,7 @@ export default async function Home() {
       {/* Calendar Section wrapped in Card */}
       <Card className="shadow-sm rounded-xl">
         <CardContent className="p-6">
-          <CalendarPage initialReservations={reservations} rooms={rooms} isAuthenticated={!!user} />
+          <CalendarPage initialReservations={reservations} rooms={rooms} isAuthenticated={!!user} currentUserId={user.id} isAdmin={isAdmin} />
         </CardContent>
       </Card>
     </div>

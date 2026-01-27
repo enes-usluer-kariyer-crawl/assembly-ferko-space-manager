@@ -57,6 +57,7 @@ type CalendarEvent = {
     cateringRequested?: boolean;
     isRecurring?: boolean;
     userName?: string;
+    userId?: string;
     // For big_event_block: the name of the main event that caused the block
     blockedByEventName?: string;
   };
@@ -157,9 +158,11 @@ type BookingCalendarProps = {
   rooms: Room[];
   onRefresh: () => Promise<void>;
   isAuthenticated: boolean;
+  currentUserId?: string;
+  isAdmin?: boolean;
 };
 
-export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthenticated }: BookingCalendarProps) {
+export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthenticated, currentUserId, isAdmin = false }: BookingCalendarProps) {
   const router = useRouter();
   const [reservations, setReservations] = useState<Reservation[]>(initialReservations);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -188,6 +191,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           cateringRequested: reservation.catering_requested,
           isRecurring: reservation.is_recurring,
           userName,
+          userId: reservation.user_id,
         },
       };
     });
@@ -436,6 +440,9 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
         open={detailDialogOpen}
         onOpenChange={setDetailDialogOpen}
         event={selectedEvent}
+        currentUserId={currentUserId}
+        isAdmin={isAdmin}
+        onCancelled={onRefresh}
       />
     </div>
     </TooltipProvider>

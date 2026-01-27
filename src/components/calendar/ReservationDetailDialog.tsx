@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import {
@@ -7,8 +8,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { Clock, MapPin, FileText, Coffee, Repeat } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Clock, MapPin, FileText, Coffee, Repeat, X } from "lucide-react";
+import { cancelReservation } from "@/lib/actions/reservations";
+import { toast } from "sonner";
 
 type ReservationDetailDialogProps = {
   open: boolean;
@@ -26,8 +31,12 @@ type ReservationDetailDialogProps = {
       tags?: string[];
       cateringRequested?: boolean;
       isRecurring?: boolean;
+      userId?: string;
     };
   } | null;
+  currentUserId?: string;
+  isAdmin?: boolean;
+  onCancelled?: () => void;
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -66,7 +75,12 @@ export function ReservationDetailDialog({
   open,
   onOpenChange,
   event,
+  currentUserId,
+  isAdmin = false,
+  onCancelled,
 }: ReservationDetailDialogProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
   if (!event) return null;
 
   const formatDateTime = (date: Date) => {
@@ -75,6 +89,35 @@ export function ReservationDetailDialog({
 
   // Extract title without room name suffix for cleaner display
   const displayTitle = event.title.replace(` (${event.resource.roomName})`, "");
+
+  // Check if user can cancel this reservation
+  const isOwner = currentUserId && event.resource.userId === currentUserId;
+  const canCancel = (isOwner || isAdmin) && event.resource.status !== "cancelled" && event.resource.status !== "rejected";
+
+  // Dynamic button label based on status
+  const cancelButtonLabel = event.resource.status === "pending" ? "Talebi Geri Çek" : "İptal Et";
+
+  const handleCancel = async () => {
+    if (!window.confirm("Emin misiniz?")) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await cancelReservation(event.id);
+      if (result.success) {
+        toast.success(result.message || "Rezervasyon iptal edildi.");
+        onOpenChange(false);
+        onCancelled?.();
+      } else {
+        toast.error(result.message || "Bir hata oluştu.");
+      }
+    } catch {
+      toast.error("Bir hata oluştu.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -148,6 +191,21 @@ export function ReservationDetailDialog({
             </div>
           )}
         </div>
+
+        {/* Footer with Cancel Button */}
+        {canCancel && (
+          <DialogFooter className="pt-4 border-t">
+            <Button
+              variant="destructive"
+              onClick={handleCancel}
+              disabled={isLoading}
+              className="gap-2"
+            >
+              <X className="h-4 w-4" />
+              {isLoading ? "İptal ediliyor..." : cancelButtonLabel}
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
