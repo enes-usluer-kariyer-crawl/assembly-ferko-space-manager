@@ -49,11 +49,13 @@ export default async function AdminApprovalsPage() {
   // Check if user is admin
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("role")
+    .select("is_admin, role")
     .eq("id", user.id)
     .single();
 
-  if (profileError || !profile || profile.role !== "admin") {
+  const isAdmin = profile?.is_admin === true || profile?.role === "admin";
+
+  if (profileError || !profile || !isAdmin) {
     redirect("/");
   }
 

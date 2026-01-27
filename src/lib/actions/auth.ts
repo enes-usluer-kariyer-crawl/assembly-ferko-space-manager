@@ -63,3 +63,45 @@ export async function signOut() {
   revalidatePath("/", "layout");
   redirect("/login");
 }
+
+export async function isAdmin(): Promise<boolean> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return false;
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_admin, role")
+    .eq("id", user.id)
+    .single();
+
+  return profile?.is_admin === true || profile?.role === "admin";
+}
+
+export async function getCurrentUserWithAdminStatus() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { user: null, isAdmin: false };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_admin, role")
+    .eq("id", user.id)
+    .single();
+
+  const isAdmin = profile?.is_admin === true || profile?.role === "admin";
+
+  return { user, isAdmin };
+}

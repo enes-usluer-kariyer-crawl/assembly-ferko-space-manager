@@ -59,5 +59,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // SECURITY: Protect admin routes - only allow admins to access /admin/*
+  if (user && request.nextUrl.pathname.startsWith("/admin")) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_admin, role")
+      .eq("id", user.id)
+      .single();
+
+    const isAdmin = profile?.is_admin === true || profile?.role === "admin";
+
+    if (!isAdmin) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+  }
+
   return supabaseResponse;
 }

@@ -30,10 +30,10 @@ export default async function RootLayout({
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("is_admin, role")
       .eq("id", user.id)
       .single();
-    isAdmin = profile?.role === "admin";
+    isAdmin = profile?.is_admin === true || profile?.role === "admin";
   }
 
   return (
