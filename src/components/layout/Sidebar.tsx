@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, Shield, User, LogOut, LogIn, UserPlus } from "lucide-react";
+import { Home, CalendarDays, Shield, User, LogOut, LogIn } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -136,14 +136,8 @@ export function Sidebar({ user, isAdmin }: SidebarProps) {
             </button>
           </div>
         ) : (
-          <div className="border-t border-[hsl(var(--sidebar-border))] p-4 space-y-2">
+          <div className="border-t border-[hsl(var(--sidebar-border))] p-4">
             <Button asChild className="w-full gap-2">
-              <Link href="/signup">
-                <UserPlus className="h-4 w-4" />
-                Kayıt Ol
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full gap-2">
               <Link href="/login">
                 <LogIn className="h-4 w-4" />
                 Giriş Yap
