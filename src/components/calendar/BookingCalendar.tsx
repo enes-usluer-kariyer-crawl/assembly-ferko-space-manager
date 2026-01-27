@@ -202,32 +202,42 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
       };
     }
 
-    let colorClass = "bg-gray-500";
+    let backgroundColor = '#3b82f6'; // Default Blue (Büyük Oda)
+
     switch (event.room) {
-      case 'Büyük Oda':
-        colorClass = "bg-blue-600";
-        break;
       case 'Demo Odası':
-        colorClass = "bg-amber-500";
+        backgroundColor = '#f97316'; // Orange
         break;
       case 'Eğitim Odası':
-        colorClass = "bg-emerald-600";
+        backgroundColor = '#10b981'; // Emerald/Green
         break;
       case 'Koltuklu Oda':
-        colorClass = "bg-purple-600";
+        backgroundColor = '#9333ea'; // Purple
         break;
       case 'Masalı Oda':
-        colorClass = "bg-rose-600";
+        backgroundColor = '#e11d48'; // Rose/Red
         break;
     }
 
-    const isPending = event.resource.status === 'pending';
+    // Handle "Pending" status visual (e.g., striped or lighter opacity)
+    if (event.resource.status === 'pending') {
+      return {
+        style: {
+          backgroundColor: backgroundColor,
+          opacity: 0.7,
+          border: '2px dashed #fff',
+          color: 'white',
+          borderRadius: '6px'
+        }
+      };
+    }
 
     return {
-      className: `${colorClass} text-white rounded-md border-none`,
       style: {
-        opacity: isPending ? 0.75 : 1, // Visual cue for pending
-        border: isPending ? "2px dashed rgba(255,255,255,0.6)" : "none",
+        backgroundColor,
+        color: 'white',
+        borderRadius: '6px',
+        border: 'none'
       }
     };
   }, []);
