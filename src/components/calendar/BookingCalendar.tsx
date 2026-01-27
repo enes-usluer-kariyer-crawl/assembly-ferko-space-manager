@@ -55,6 +55,18 @@ type CalendarEvent = {
 
 // Custom event component to show icons
 function EventComponent({ event }: { event: CalendarEvent }) {
+  const tags = event.resource.tags || [];
+  const isBigEventBlock = tags.includes("big_event_block");
+
+  // Simplified view for Big Event blocks
+  if (isBigEventBlock) {
+    return (
+      <div className="flex items-center justify-center h-full text-center">
+        <span className="text-xs font-medium">⛔ KAPALI</span>
+      </div>
+    );
+  }
+
   const displayTitle = event.title.replace(` (${event.resource.roomName})`, "");
   return (
     <div className="flex items-center gap-1 overflow-hidden">
@@ -113,6 +125,43 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
     const colors = ROOM_COLORS[event.resource.roomName] || DEFAULT_COLOR;
     const isPending = event.resource.status === "pending";
+    const tags = event.resource.tags || [];
+    const isBigEventBlock = tags.includes("big_event_block");
+    const isBigEvent = tags.includes("big_event");
+
+    // Big Event Block: Grey striped pattern, unclickable
+    if (isBigEventBlock) {
+      return {
+        style: {
+          background: "repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 10px, #e5e7eb 10px, #e5e7eb 20px)",
+          border: "1px solid #d1d5db",
+          opacity: 1,
+          color: "#6b7280",
+          borderRadius: "4px",
+          fontSize: "0.75rem",
+          fontWeight: 500,
+          pointerEvents: "none" as const,
+          cursor: "default",
+        },
+      };
+    }
+
+    // Main Big Event: Prominent styling
+    if (isBigEvent) {
+      return {
+        style: {
+          backgroundColor: "#7c2d12",
+          border: "3px solid #450a0a",
+          opacity: 1,
+          color: "#ffffff",
+          borderRadius: "6px",
+          fontSize: "0.875rem",
+          fontWeight: 700,
+          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.2)",
+          zIndex: 10,
+        },
+      };
+    }
 
     if (isPending) {
       // Pending: Light orange/amber background with dashed border
@@ -246,6 +295,16 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
               style={{ borderLeft: "4px solid #3b82f6", backgroundColor: "#3b82f615" }}
             />
             <span className="text-sm text-muted-foreground">Onaylandı</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div
+              className="w-4 h-4 rounded"
+              style={{
+                background: "repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 4px, #e5e7eb 4px, #e5e7eb 8px)",
+                border: "1px solid #d1d5db"
+              }}
+            />
+            <span className="text-sm text-muted-foreground">Ofis Kapalı</span>
           </div>
         </div>
       </div>
