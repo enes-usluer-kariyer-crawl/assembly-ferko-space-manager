@@ -212,161 +212,160 @@ export function NewReservationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form action={handleFormAction} className="space-y-4">
-          {error && (
-            <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-              {error}
-            </div>
-          )}
-
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">Başlık *</Label>
-            <Input
-              id="title"
-              name="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Toplantı başlığını girin"
-            />
-          </div>
-
-          {/* Room selection */}
-          <div className="space-y-2">
-            <Label htmlFor="room">Oda *</Label>
-            <input type="hidden" name="roomId" value={roomId} />
-            <Select value={roomId} onValueChange={setRoomId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Oda seçin" />
-              </SelectTrigger>
-              <SelectContent>
-                {rooms.map((room) => (
-                  <SelectItem key={room.id} value={room.id}>
-                    {room.name} (Kapasite: {room.capacity})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Start datetime */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="startDate">Başlangıç Tarihi *</Label>
-              <Input
-                id="startDate"
-                name="startDate"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="startTime">Başlangıç Saati *</Label>
-              <Input
-                id="startTime"
-                name="startTime"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* End datetime */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="endDate">Bitiş Tarihi *</Label>
-              <Input
-                id="endDate"
-                name="endDate"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="endTime">Bitiş Saati *</Label>
-              <Input
-                id="endTime"
-                name="endTime"
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Tags multi-select (for big events) */}
-          <div className="space-y-2">
-            <Label>Etiketler (Büyük Etkinlikler)</Label>
-            <div className="space-y-2 rounded-md border p-3">
-              {BIG_EVENT_TAGS.map((tag) => (
-                <div key={tag} className="flex items-center gap-2">
-                  <Checkbox
-                    id={`tag-${tag}`}
-                    checked={selectedTags.includes(tag)}
-                    onCheckedChange={() => handleTagToggle(tag)}
-                  />
-                  <Label
-                    htmlFor={`tag-${tag}`}
-                    className="font-normal cursor-pointer"
-                  >
-                    {tag}
-                  </Label>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Büyük etkinlikler tüm odaları bloke eder.
-            </p>
-          </div>
-
-          {/* Recurrence */}
-          <div className="space-y-2">
-            <Label htmlFor="recurrence">Tekrarla</Label>
-            <Select value={recurrencePattern} onValueChange={(value: "none" | "weekly") => setRecurrencePattern(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Tekrar seçin" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Tekrarlanmıyor</SelectItem>
-                <SelectItem value="weekly">Her Hafta</SelectItem>
-              </SelectContent>
-            </Select>
-            {recurrencePattern === "weekly" && (
-              <p className="text-xs text-muted-foreground">
-                Bu rezervasyon 4 hafta boyunca her hafta aynı gün ve saatte tekrarlanacak.
-              </p>
+        <form action={handleFormAction}>
+          <div className="max-h-[70vh] overflow-y-auto p-1 space-y-3">
+            {error && (
+              <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+                {error}
+              </div>
             )}
+
+            {/* Title */}
+            <div className="space-y-2">
+              <Label htmlFor="title">Başlık *</Label>
+              <Input
+                id="title"
+                name="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Toplantı başlığını girin"
+              />
+            </div>
+
+            {/* Room selection */}
+            <div className="space-y-2">
+              <Label htmlFor="room">Oda *</Label>
+              <input type="hidden" name="roomId" value={roomId} />
+              <Select value={roomId} onValueChange={setRoomId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Oda seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {rooms.map((room) => (
+                    <SelectItem key={room.id} value={room.id}>
+                      {room.name} (Kapasite: {room.capacity})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date and Time Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startDate">Başlangıç Tarihi *</Label>
+                <Input
+                  id="startDate"
+                  name="startDate"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="startTime">Başlangıç Saati *</Label>
+                <Input
+                  id="startTime"
+                  name="startTime"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="endDate">Bitiş Tarihi *</Label>
+                <Input
+                  id="endDate"
+                  name="endDate"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endTime">Bitiş Saati *</Label>
+                <Input
+                  id="endTime"
+                  name="endTime"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Tags multi-select (for big events) */}
+            <div className="space-y-2">
+              <Label>Etiketler (Büyük Etkinlikler)</Label>
+              <div className="flex flex-row space-x-4 rounded-md border p-3">
+                {BIG_EVENT_TAGS.map((tag) => (
+                  <div key={tag} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`tag-${tag}`}
+                      checked={selectedTags.includes(tag)}
+                      onCheckedChange={() => handleTagToggle(tag)}
+                    />
+                    <Label
+                      htmlFor={`tag-${tag}`}
+                      className="font-normal cursor-pointer"
+                    >
+                      {tag}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Büyük etkinlikler tüm odaları bloke eder.
+              </p>
+            </div>
+
+            {/* Recurrence */}
+            <div className="space-y-2">
+              <Label htmlFor="recurrence">Tekrarla</Label>
+              <Select value={recurrencePattern} onValueChange={(value: "none" | "weekly") => setRecurrencePattern(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tekrar seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Tekrarlanmıyor</SelectItem>
+                  <SelectItem value="weekly">Her Hafta</SelectItem>
+                </SelectContent>
+              </Select>
+              {recurrencePattern === "weekly" && (
+                <p className="text-xs text-muted-foreground">
+                  Bu rezervasyon 4 hafta boyunca her hafta aynı gün ve saatte tekrarlanacak.
+                </p>
+              )}
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="description">Açıklama</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Toplantı hakkında ek bilgi (opsiyonel)"
+                rows={2}
+              />
+            </div>
+
+            {/* Catering checkbox */}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="catering"
+                checked={cateringRequested}
+                onCheckedChange={(checked) => setCateringRequested(checked === true)}
+              />
+              <Label htmlFor="catering" className="font-normal cursor-pointer">
+                İkram talep ediyorum
+              </Label>
+            </div>
           </div>
 
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Açıklama</Label>
-            <Textarea
-              id="description"
-              name="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Toplantı hakkında ek bilgi (opsiyonel)"
-              rows={3}
-            />
-          </div>
-
-          {/* Catering checkbox */}
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="catering"
-              checked={cateringRequested}
-              onCheckedChange={(checked) => setCateringRequested(checked === true)}
-            />
-            <Label htmlFor="catering" className="font-normal cursor-pointer">
-              İkram talep ediyorum
-            </Label>
-          </div>
-
-          <DialogFooter>
+          <DialogFooter className="mt-4">
             <CancelButton onCancel={() => onOpenChange(false)} />
             <SubmitButton />
           </DialogFooter>
