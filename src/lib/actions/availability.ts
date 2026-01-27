@@ -8,6 +8,9 @@ const BIG_EVENT_TAGS = [
   "ÖM- HR Small Talks",
 ] as const;
 
+// Tag used for blocked placeholder reservations created during Big Events
+const BIG_EVENT_BLOCK_TAG = "big_event_block";
+
 export type AvailabilityResult = {
   available: boolean;
   reason?: string;
@@ -115,6 +118,29 @@ export async function checkAvailability({
       reason: `This time slot is blocked by a Big Event: "${blockingReservation?.title ?? "Unknown"}". All rooms are reserved.`,
       conflictingRoomId: blockingReservation?.room_id,
       conflictingReservationId: blockingReservation?.id,
+    };
+  }
+
+  // Check if this room is blocked by a Big Event placeholder
+  // (These are created when a Big Event locks out all other rooms)
+  const { data: blockedByPlaceholder } = await supabase
+    .from("reservations")
+    .select("id, room_id, title, tags")
+    .eq("room_id", roomId)
+    .in("status", ["pending", "approved"])
+    .lt("start_time", endTime)
+    .gt("end_time", startTime)
+    .neq("id", excludeReservationId ?? "00000000-0000-0000-0000-000000000000")
+    .contains("tags", [BIG_EVENT_BLOCK_TAG])
+    .limit(1)
+    .single();
+
+  if (blockedByPlaceholder) {
+    return {
+      available: false,
+      reason: `This time slot is blocked: "${blockedByPlaceholder.title}". A Big Event is in progress.`,
+      conflictingRoomId: roomId,
+      conflictingReservationId: blockedByPlaceholder.id,
     };
   }
 

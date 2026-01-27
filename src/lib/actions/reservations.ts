@@ -4,6 +4,20 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkAvailability } from "./availability";
 
+// Big Event tags that trigger global room lockout
+const BIG_EVENT_TAGS = [
+  "ÖM-Success Meetings",
+  "Exco Toplantısı",
+  "ÖM- HR Small Talks",
+] as const;
+
+// Label for blocked placeholder reservations
+const BIG_EVENT_BLOCK_LABEL = "Ofis Kapalı - Büyük Etkinlik";
+
+function isBigEventRequest(tags: string[]): boolean {
+  return tags.some((tag) => BIG_EVENT_TAGS.includes(tag as (typeof BIG_EVENT_TAGS)[number]));
+}
+
 export type Room = {
   id: string;
   name: string;
@@ -154,10 +168,23 @@ export type CreateReservationInput = {
   isRecurring?: boolean;
 };
 
+export type ConflictingReservation = {
+  id: string;
+  title: string;
+  roomName: string;
+  startTime: string;
+  endTime: string;
+};
+
 export type CreateReservationResult = {
   success: boolean;
   error?: string;
   reservationId?: string;
+  // For Big Events: warnings about existing meetings that clash
+  conflictWarning?: {
+    message: string;
+    conflicts: ConflictingReservation[];
+  };
 };
 
 export async function createReservation(
@@ -260,6 +287,35 @@ export async function createReservation(
   // Determine status based on user role
   const status = profile.role === "admin" ? "approved" : "pending";
 
+  const isBigEvent = isBigEventRequest(tags ?? []);
+  let conflictWarning: CreateReservationResult["conflictWarning"] = undefined;
+
+  // For Big Events: Check for existing bookings in other rooms and warn admin
+  if (isBigEvent) {
+    const { data: existingBookings } = await supabase
+      .from("reservations")
+      .select("id, title, room_id, start_time, end_time, rooms(name)")
+      .in("status", ["pending", "approved"])
+      .neq("room_id", roomId)
+      .lt("start_time", endTime)
+      .gt("end_time", startTime);
+
+    if (existingBookings && existingBookings.length > 0) {
+      const conflicts: ConflictingReservation[] = existingBookings.map((booking) => ({
+        id: booking.id,
+        title: booking.title,
+        roomName: (booking.rooms as unknown as { name: string })?.name ?? "Unknown",
+        startTime: booking.start_time,
+        endTime: booking.end_time,
+      }));
+
+      conflictWarning = {
+        message: `Warning: ${conflicts.length} existing meeting(s) clash with this Big Event time slot. These rooms will be blocked.`,
+        conflicts,
+      };
+    }
+  }
+
   // Insert reservation
   const { data: reservation, error: insertError } = await supabase
     .from("reservations")
@@ -286,6 +342,42 @@ export async function createReservation(
     };
   }
 
+  // For Big Events: Create blocked placeholder reservations for ALL OTHER ROOMS
+  if (isBigEvent) {
+    // Get all other active rooms
+    const { data: otherRooms } = await supabase
+      .from("rooms")
+      .select("id")
+      .eq("is_active", true)
+      .neq("id", roomId);
+
+    if (otherRooms && otherRooms.length > 0) {
+      // Create blocked reservations for each other room
+      const blockedReservations = otherRooms.map((otherRoom) => ({
+        room_id: otherRoom.id,
+        user_id: user.id,
+        title: BIG_EVENT_BLOCK_LABEL,
+        description: `Blocked due to Big Event: ${title}`,
+        start_time: startTime,
+        end_time: endTime,
+        status: "approved" as const,
+        tags: ["big_event_block"],
+        catering_requested: false,
+        is_recurring: false,
+      }));
+
+      const { error: blockInsertError } = await supabase
+        .from("reservations")
+        .insert(blockedReservations);
+
+      if (blockInsertError) {
+        console.error("Error creating blocked reservations:", blockInsertError);
+        // Note: The main reservation was created successfully, so we don't fail the entire operation
+        // but log the error for debugging
+      }
+    }
+  }
+
   // Revalidate paths to refresh data
   revalidatePath("/");
   revalidatePath("/reservations");
@@ -294,6 +386,7 @@ export async function createReservation(
   return {
     success: true,
     reservationId: reservation.id,
+    conflictWarning,
   };
 }
 
