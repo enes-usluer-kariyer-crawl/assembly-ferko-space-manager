@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, dateFnsLocalizer, Views, SlotInfo } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay, differenceInMinutes, areIntervalsOverlapping } from "date-fns";
@@ -132,6 +132,11 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
   const router = useRouter();
   const [reservations, setReservations] = useState<Reservation[]>(initialReservations);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Sync local state when parent passes updated reservations
+  useEffect(() => {
+    setReservations(initialReservations);
+  }, [initialReservations]);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
