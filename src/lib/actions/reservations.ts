@@ -435,13 +435,17 @@ export async function createReservation(
 
     if (otherRooms && otherRooms.length > 0) {
       // Create blocked reservations for each other room
+      // FIX: Use start/end strings directly to avoid timezone shifts
+      const blockStartTime = startTime;
+      const blockEndTime = endTime;
+      
       const blockedReservations = otherRooms.map((otherRoom) => ({
         room_id: otherRoom.id,
         user_id: user.id,
         title: BIG_EVENT_BLOCK_LABEL,
         description: `Blocked due to Big Event: ${title}`,
-        start_time: startTime,
-        end_time: endTime,
+        start_time: blockStartTime,
+        end_time: blockEndTime,
         status: "approved" as const,
         tags: ["big_event_block"],
         catering_requested: false,

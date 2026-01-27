@@ -32,6 +32,7 @@ type ReservationDetailDialogProps = {
       cateringRequested?: boolean;
       isRecurring?: boolean;
       userId?: string;
+      userName?: string;
     };
   } | null;
   currentUserId?: string;
@@ -150,6 +151,17 @@ export function ReservationDetailDialog({
               </div>
             </div>
           </div>
+
+          {/* Creator */}
+          {event.resource.userName && (
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <User className="h-5 w-5 flex-shrink-0" />
+              <span className="text-foreground">
+                <span className="font-medium text-muted-foreground mr-1">Toplantı Sahibi:</span>
+                {event.resource.userName}
+              </span>
+            </div>
+          )}
 
           {/* Description */}
           {event.resource.description && (
