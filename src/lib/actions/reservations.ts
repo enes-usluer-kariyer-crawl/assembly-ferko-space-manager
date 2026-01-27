@@ -189,6 +189,7 @@ export type ConflictingReservation = {
   roomName: string;
   startTime: string;
   endTime: string;
+  ownerName?: string;
 };
 
 export type CreateReservationResult = {
@@ -200,6 +201,9 @@ export type CreateReservationResult = {
     message: string;
     conflicts: ConflictingReservation[];
   };
+  // For Admin Blocking Events: conflicts that must be resolved before proceeding
+  conflictType?: "BLOCKING";
+  conflictingEvents?: ConflictingReservation[];
 };
 
 export async function createReservation(
@@ -324,13 +328,15 @@ export async function createReservation(
   const isBigEvent = isBigEventRequest(tags ?? []);
   let conflictWarning: CreateReservationResult["conflictWarning"] = undefined;
 
-  // For Big Events: Check for existing bookings in other rooms and warn admin
+  // For Big Events: Check for existing bookings that conflict and BLOCK creation
+  // Admin must manually cancel these reservations first
   if (isBigEvent) {
+    // Query to find ALL existing active reservations in the time range (any room)
     const { data: existingBookings } = await supabase
       .from("reservations")
-      .select("id, title, room_id, start_time, end_time, rooms(name)")
+      .select("id, title, room_id, start_time, end_time, rooms(name), profiles(full_name)")
       .in("status", ["pending", "approved"])
-      .neq("room_id", roomId)
+      .not("tags", "cs", '{"big_event_block"}') // Exclude placeholder blocks
       .lt("start_time", endTime)
       .gt("end_time", startTime);
 
@@ -341,11 +347,15 @@ export async function createReservation(
         roomName: (booking.rooms as unknown as { name: string })?.name ?? "Unknown",
         startTime: booking.start_time,
         endTime: booking.end_time,
+        ownerName: (booking.profiles as unknown as { full_name: string | null })?.full_name ?? undefined,
       }));
 
-      conflictWarning = {
-        message: `Warning: ${conflicts.length} existing meeting(s) clash with this Big Event time slot. These rooms will be blocked.`,
-        conflicts,
+      // BLOCKING: Do NOT create the reservation, return conflict data
+      return {
+        success: false,
+        conflictType: "BLOCKING",
+        conflictingEvents: conflicts,
+        error: `Bu saat aralığında ${conflicts.length} adet toplantı var. Blokaj koymak için önce bu toplantıların iptal edilmesi gerekmektedir.`,
       };
     }
   }

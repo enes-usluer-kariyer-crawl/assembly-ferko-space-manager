@@ -25,9 +25,10 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 
-import type { Room } from "@/lib/actions/reservations";
+import type { Room, ConflictingReservation } from "@/lib/actions/reservations";
 import { createReservation } from "@/lib/actions/reservations";
 import { ROOM_CAPACITIES } from "@/constants/rooms";
+import { AlertTriangle } from "lucide-react";
 
 type NewReservationDialogProps = {
   open: boolean;
@@ -84,6 +85,7 @@ export function NewReservationDialog({
   onSuccess,
 }: NewReservationDialogProps) {
   const [error, setError] = useState<string | null>(null);
+  const [blockingConflicts, setBlockingConflicts] = useState<ConflictingReservation[] | null>(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -113,6 +115,7 @@ export function NewReservationDialog({
   useEffect(() => {
     if (open) {
       setError(null);
+      setBlockingConflicts(null);
       setTitle("");
       setDescription("");
       setRoomId(initialRoomId || "");
@@ -157,6 +160,7 @@ export function NewReservationDialog({
 
   const handleFormAction = async (formData: FormData) => {
     setError(null);
+    setBlockingConflicts(null);
 
     // Validate form
     const formTitle = formData.get("title") as string;
@@ -228,6 +232,13 @@ export function NewReservationDialog({
       });
 
       if (!result.success) {
+        // Handle BLOCKING conflict type specifically
+        if (result.conflictType === "BLOCKING" && result.conflictingEvents) {
+          setBlockingConflicts(result.conflictingEvents);
+          // Don't show generic error, the blocking dialog will be shown
+          return;
+        }
+
         const errorMessage = result.error || "Rezervasyon oluşturulamadı.";
         setError(errorMessage);
         // Show toast for conflict errors (red alert)
@@ -260,6 +271,53 @@ export function NewReservationDialog({
             {error && (
               <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
                 {error}
+              </div>
+            )}
+
+            {/* Blocking Conflicts Alert */}
+            {blockingConflicts && blockingConflicts.length > 0 && (
+              <div className="p-4 border border-orange-300 bg-orange-50 rounded-md space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-orange-800">
+                      Bu saat aralığında {blockingConflicts.length} adet toplantı var.
+                    </p>
+                    <p className="text-sm text-orange-700">
+                      Blokaj koymak için önce bu toplantıların iptal edilmesi gerekmektedir.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2 mt-3">
+                  <p className="text-xs font-medium text-orange-800 uppercase tracking-wide">
+                    Çakışan Toplantılar:
+                  </p>
+                  <ul className="space-y-2">
+                    {blockingConflicts.map((conflict) => (
+                      <li
+                        key={conflict.id}
+                        className="text-sm text-orange-900 bg-orange-100 rounded px-3 py-2"
+                      >
+                        <span className="font-medium">{conflict.roomName}</span>
+                        {" - "}
+                        {conflict.title}
+                        {conflict.ownerName && (
+                          <span className="text-orange-700"> ({conflict.ownerName})</span>
+                        )}
+                        <div className="text-xs text-orange-600 mt-1">
+                          {new Date(conflict.startTime).toLocaleString("tr-TR", {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })}
+                          {" - "}
+                          {new Date(conflict.endTime).toLocaleString("tr-TR", {
+                            timeStyle: "short",
+                          })}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             )}
 
