@@ -3,7 +3,7 @@
 import { useFormState, useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { signup } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+const ALLOWED_DOMAINS_REGEX = /^[\w-.]+@(kariyer\.net|techcareer\.net|coens\.io)$/i;
+
 function SubmitButton() {
   const { pending } = useFormStatus();
 
@@ -29,6 +31,7 @@ function SubmitButton() {
 
 export default function SignupPage() {
   const [state, formAction] = useFormState(signup, undefined);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -37,6 +40,18 @@ export default function SignupPage() {
       router.refresh();
     }
   }, [state, router]);
+
+  const handleSubmit = (formData: FormData) => {
+    const email = formData.get("email") as string;
+
+    if (!ALLOWED_DOMAINS_REGEX.test(email)) {
+      setEmailError("Sadece kurumsal e-posta adresleri (kariyer.net, techcareer.net, coens.io) ile kayıt olabilirsiniz.");
+      return;
+    }
+
+    setEmailError(null);
+    formAction(formData);
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 dark:bg-gray-900 sm:px-6 lg:px-8">
@@ -50,7 +65,7 @@ export default function SignupPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="space-y-4">
+          <form action={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="full_name">Ad Soyad</Label>
               <Input
@@ -79,9 +94,9 @@ export default function SignupPage() {
                 required
               />
             </div>
-            {state?.error && (
+            {(state?.error || emailError) && (
               <div className="text-sm text-red-500 font-medium">
-                {state.error}
+                {emailError || state?.error}
               </div>
             )}
             <div className="pt-2">

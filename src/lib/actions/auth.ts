@@ -36,6 +36,14 @@ export async function signup(prevState: AuthState, formData: FormData) {
   const password = formData.get("password") as string;
   const full_name = formData.get("full_name") as string;
 
+  // Corporate email domain validation
+  const allowedDomains = ['kariyer.net', 'techcareer.net', 'coens.io'];
+  const emailDomain = email.split('@')[1]?.toLowerCase();
+
+  if (!emailDomain || !allowedDomains.includes(emailDomain)) {
+    return { error: "Yetkisiz e-posta uzantısı. Sadece kurumsal mailler kabul edilir." };
+  }
+
   console.log(`Signup started for email: ${email}`);
 
   const { data, error } = await supabase.auth.signUp({
