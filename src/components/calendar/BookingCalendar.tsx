@@ -169,10 +169,10 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
 
   // Filter out "Blocked" events (big_event_block) - don't render as cards
   const visibleEvents = useMemo(() => {
-    return allEvents.filter(e => e.title !== 'Ofis Kapalı');
+    return allEvents.filter(e => !(e.resource.tags || []).includes("big_event_block"));
   }, [allEvents]);
 
-  // Get big event time ranges for hatched background
+  // Get big event time ranges for hatched background (from blocked placeholder events)
   const bigEventRanges = useMemo(() => {
     return allEvents
       .filter(e => (e.resource.tags || []).includes("big_event_block"))
