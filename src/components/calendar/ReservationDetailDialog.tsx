@@ -72,6 +72,14 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function PastEventBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-600 border border-slate-300">
+      Geçmiş Etkinlik
+    </span>
+  );
+}
+
 export function ReservationDetailDialog({
   open,
   onOpenChange,
@@ -91,9 +99,12 @@ export function ReservationDetailDialog({
   // Extract title without room name suffix for cleaner display
   const displayTitle = event.title.replace(` (${event.resource.roomName})`, "");
 
-  // Check if user can cancel this reservation
+  // Check if event is in the past
+  const isPastEvent = event.end < new Date();
+
+  // Check if user can cancel this reservation (not past, not already cancelled/rejected)
   const isOwner = currentUserId && event.resource.userId === currentUserId;
-  const canCancel = (isOwner || isAdmin) && event.resource.status !== "cancelled" && event.resource.status !== "rejected";
+  const canCancel = (isOwner || isAdmin) && event.resource.status !== "cancelled" && event.resource.status !== "rejected" && !isPastEvent;
 
   // Dynamic button label based on status
   const cancelButtonLabel = event.resource.status === "pending" ? "Talebi Geri Çek" : "İptal Et";
@@ -127,8 +138,9 @@ export function ReservationDetailDialog({
           <div className="flex items-start justify-between gap-4">
             <DialogTitle className="text-xl pr-4">{displayTitle}</DialogTitle>
           </div>
-          <div className="pt-2">
+          <div className="pt-2 flex flex-wrap gap-2">
             <StatusBadge status={event.resource.status} />
+            {isPastEvent && <PastEventBadge />}
           </div>
         </DialogHeader>
 

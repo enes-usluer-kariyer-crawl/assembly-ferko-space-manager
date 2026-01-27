@@ -234,6 +234,14 @@ export async function createReservation(
     };
   }
 
+  // Prevent booking in the past
+  if (start < new Date()) {
+    return {
+      success: false,
+      error: "Geçmişe rezervasyon yapılamaz.",
+    };
+  }
+
   const supabase = await createClient();
 
   // Get current user
@@ -548,6 +556,28 @@ export async function updateReservationStatus(
     };
   }
 
+  // Fetch the reservation to check if it's in the past
+  const { data: reservation, error: reservationError } = await supabase
+    .from("reservations")
+    .select("end_time")
+    .eq("id", id)
+    .single();
+
+  if (reservationError || !reservation) {
+    return {
+      success: false,
+      error: "Reservation not found.",
+    };
+  }
+
+  // Prevent modifying past events
+  if (new Date(reservation.end_time) < new Date()) {
+    return {
+      success: false,
+      error: "Geçmiş etkinlikler düzenlenemez.",
+    };
+  }
+
   // Update the reservation status
   const { error: updateError } = await supabase
     .from("reservations")
@@ -668,10 +698,10 @@ export async function cancelReservation(
     };
   }
 
-  // Fetch the reservation to get the owner
+  // Fetch the reservation to get the owner and end_time
   const { data: reservation, error: reservationError } = await supabase
     .from("reservations")
-    .select("id, user_id, status")
+    .select("id, user_id, status, end_time")
     .eq("id", reservationId)
     .single();
 
@@ -687,6 +717,14 @@ export async function cancelReservation(
     return {
       success: false,
       message: "Bu rezervasyon zaten iptal edilmiş.",
+    };
+  }
+
+  // Prevent modifying past events
+  if (new Date(reservation.end_time) < new Date()) {
+    return {
+      success: false,
+      message: "Geçmiş etkinlikler düzenlenemez.",
     };
   }
 

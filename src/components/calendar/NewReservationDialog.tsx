@@ -98,6 +98,17 @@ export function NewReservationDialog({
   const [recurrencePattern, setRecurrencePattern] = useState<"none" | "weekly">("none");
   const [attendeeCount, setAttendeeCount] = useState<string>("");
 
+  // Get today's date in YYYY-MM-DD format for min date validation
+  const today = new Date().toISOString().split("T")[0];
+
+  // Get current time for min time validation when date is today
+  const getCurrentMinTime = () => {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, "0");
+    const minutes = now.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
   // Reset form when dialog opens/closes or initial times change
   useEffect(() => {
     if (open) {
@@ -186,6 +197,12 @@ export function NewReservationDialog({
     // Construct Date objects from local inputs to handle timezone correctly
     const startLocal = new Date(`${formStartDate}T${formStartTime}:00`);
     const endLocal = new Date(`${formEndDate}T${formEndTime}:00`);
+
+    // Validate: cannot book in the past
+    if (startLocal < new Date()) {
+      setError("Geçmişe rezervasyon yapılamaz.");
+      return;
+    }
 
     // Validate times
     if (endLocal <= startLocal) {
@@ -305,6 +322,7 @@ export function NewReservationDialog({
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
+                  min={today}
                 />
               </div>
               <div className="space-y-2">
@@ -315,6 +333,7 @@ export function NewReservationDialog({
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
+                  min={startDate === today ? getCurrentMinTime() : undefined}
                 />
               </div>
 
@@ -326,6 +345,7 @@ export function NewReservationDialog({
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate || today}
                 />
               </div>
               <div className="space-y-2">
@@ -336,6 +356,7 @@ export function NewReservationDialog({
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
+                  min={endDate === today ? getCurrentMinTime() : undefined}
                 />
               </div>
             </div>
