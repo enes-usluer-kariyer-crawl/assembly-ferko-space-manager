@@ -94,10 +94,10 @@ function EventComponent({ event }: { event: CalendarEvent }) {
 
   // Standard event content
   const eventContent = (
-    <div className="flex flex-col gap-0.5 overflow-hidden h-full py-0.5">
+    <div className="flex flex-col gap-1 overflow-hidden h-full p-1">
       {/* Title (bold) */}
       <div className="flex items-center gap-1">
-        <span className="font-semibold truncate text-sm">{displayTitle}</span>
+        <span className="font-bold truncate text-sm">{displayTitle}</span>
         {event.resource.cateringRequested && (
           <Coffee className="h-3 w-3 flex-shrink-0" />
         )}
@@ -383,7 +383,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
       </div>
 
       {/* Calendar */}
-      <div className="flex-1 min-h-[600px] bg-background rounded-lg border">
+      <div className="flex-1 bg-background rounded-lg border" style={{ height: 'calc(100vh - 150px)' }}>
         <Calendar
           localizer={localizer}
           events={events}

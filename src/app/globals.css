@@ -154,6 +154,7 @@
 
 .rbc-timeslot-group {
   @apply border-b border-border/30;
+  min-height: 100px !important; /* Make each hour slot significantly taller */
 }
 
 .rbc-time-gutter {
