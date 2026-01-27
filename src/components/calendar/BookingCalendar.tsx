@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, dateFnsLocalizer, Views, SlotInfo } from "react-big-calendar";
-import { format, parse, startOfWeek, getDay } from "date-fns";
+import { format, parse, startOfWeek, getDay, differenceInMinutes } from "date-fns";
 import { tr } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
@@ -59,6 +59,9 @@ function EventComponent({ event }: { event: CalendarEvent }) {
   const tags = event.resource.tags || [];
   const isBigEventBlock = tags.includes("big_event_block");
 
+  const duration = differenceInMinutes(event.end, event.start);
+  const isShort = duration <= 45;
+
   // Big Event Block: Minimal container with just an icon, tooltip shows details
   if (isBigEventBlock) {
     const mainEventName = event.resource.blockedByEventName ||
@@ -82,23 +85,27 @@ function EventComponent({ event }: { event: CalendarEvent }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="h-full w-full p-1 overflow-hidden flex flex-col">
-          {/* Title (bold) */}
-          <div className="font-bold text-sm truncate">{event.title}</div>
-          {/* User name (small) */}
-          {event.resource.userName && (
-            <div className="text-xs opacity-90 truncate">{event.resource.userName}</div>
+        <div className="h-full flex flex-col justify-center overflow-hidden">
+          {/* Title: Always show, but adjust size */}
+          <div className={`font-bold truncate ${isShort ? 'text-[10px] leading-3' : 'text-xs'}`}>
+            {event.title}
+          </div>
+          {/* Owner: Only show if there is enough space (duration > 45 mins) */}
+          {!isShort && event.resource.userName && (
+            <div className="text-[10px] opacity-90 truncate">{event.resource.userName}</div>
           )}
           
           {/* Icons row */}
-          <div className="mt-auto flex items-center gap-1 justify-end opacity-80">
-            {event.resource.isRecurring && (
-              <Repeat className="h-3 w-3" />
-            )}
-            {event.resource.cateringRequested && (
-              <Coffee className="h-3 w-3" />
-            )}
-          </div>
+          {!isShort && (
+            <div className="mt-auto flex items-center gap-1 justify-end opacity-80">
+              {event.resource.isRecurring && (
+                <Repeat className="h-3 w-3" />
+              )}
+              {event.resource.cateringRequested && (
+                <Coffee className="h-3 w-3" />
+              )}
+            </div>
+          )}
         </div>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-sm">

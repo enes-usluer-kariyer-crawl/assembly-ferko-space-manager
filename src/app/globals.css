@@ -176,6 +176,8 @@
 /* Event styling */
 .rbc-event {
   @apply rounded-md px-2 py-1 text-sm font-medium border-0;
+  padding: 1px 4px !important; /* Minimize padding */
+  line-height: 1.1 !important;
 }
 
 .rbc-event:focus {
@@ -183,7 +185,7 @@
 }
 
 .rbc-event-label {
-  @apply hidden;
+  display: none !important;
 }
 
 .rbc-event-content {
