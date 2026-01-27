@@ -34,6 +34,7 @@ type NewReservationDialogProps = {
   rooms: Room[];
   initialStartTime?: Date;
   initialEndTime?: Date;
+  initialRoomId?: string;
   onSuccess: () => void;
 };
 
@@ -78,6 +79,7 @@ export function NewReservationDialog({
   rooms,
   initialStartTime,
   initialEndTime,
+  initialRoomId,
   onSuccess,
 }: NewReservationDialogProps) {
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export function NewReservationDialog({
       setError(null);
       setTitle("");
       setDescription("");
-      setRoomId("");
+      setRoomId(initialRoomId || "");
       setSelectedTags([]);
       setCateringRequested(false);
       setRecurrencePattern("none");
