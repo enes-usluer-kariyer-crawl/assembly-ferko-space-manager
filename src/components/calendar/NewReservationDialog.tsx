@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import {
@@ -84,6 +85,7 @@ export function NewReservationDialog({
   initialRoomId,
   onSuccess,
 }: NewReservationDialogProps) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [blockingConflicts, setBlockingConflicts] = useState<ConflictingReservation[] | null>(null);
 
@@ -247,6 +249,8 @@ export function NewReservationDialog({
         return;
       }
 
+      // Trigger server data re-fetch to update calendar without page reload
+      router.refresh();
       onSuccess();
     } catch (err) {
       console.error("Error creating reservation:", err);
