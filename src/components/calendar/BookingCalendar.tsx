@@ -18,7 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Plus, Coffee, Repeat, Ban } from "lucide-react";
+import { Plus, Coffee, Repeat, Ban, Lock } from "lucide-react";
 
 const locales = {
   "tr": tr,
@@ -80,13 +80,12 @@ function EventComponent({ event }: { event: CalendarEvent }) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex items-center justify-center h-full w-full cursor-default">
-            <Ban className="h-4 w-4 text-gray-400" />
+          <div className="flex items-center justify-center h-full w-full cursor-default opacity-50">
+            <Lock className="h-4 w-4 text-muted-foreground" />
           </div>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs">
-          <div className="font-semibold text-destructive">Ofis Kapalı</div>
-          <div className="text-sm text-muted-foreground">{mainEventName}</div>
+          <div className="font-medium">Ofis Kapalı <span className="text-muted-foreground">({mainEventName})</span></div>
         </TooltipContent>
       </Tooltip>
     );
@@ -97,13 +96,10 @@ function EventComponent({ event }: { event: CalendarEvent }) {
 
   // Standard event content
   const eventContent = (
-    <div className="flex flex-col gap-1 overflow-hidden h-full p-1">
+    <div className="relative flex flex-col gap-1 overflow-hidden h-full p-1">
       {/* Title (bold) */}
       <div className="flex items-center gap-1">
-        <span className="font-bold truncate text-sm">{displayTitle}</span>
-        {event.resource.cateringRequested && (
-          <Coffee className="h-3 w-3 flex-shrink-0" />
-        )}
+        <span className="font-bold truncate text-sm pr-4">{displayTitle}</span>
         {event.resource.isRecurring && (
           <Repeat className="h-3 w-3 flex-shrink-0" />
         )}
@@ -111,6 +107,11 @@ function EventComponent({ event }: { event: CalendarEvent }) {
       {/* User name (small) - only show if not a big event */}
       {userName && !isBigEvent && (
         <span className="text-xs opacity-75 truncate">{userName}</span>
+      )}
+      
+      {/* Catering Icon - Absolute Positioned */}
+      {event.resource.cateringRequested && (
+        <Coffee className="absolute bottom-1 right-1 h-4 w-4 text-foreground/70" />
       )}
     </div>
   );
@@ -209,13 +210,13 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
     const isBigEventBlock = tags.includes("big_event_block");
     const isBigEvent = tags.includes("big_event");
 
-    // Big Event Block: Grey striped pattern, lower z-index than main event
+    // Big Event Block: Solid light gray background, no border
     if (isBigEventBlock) {
       return {
         style: {
-          background: "repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 10px, #e5e7eb 10px, #e5e7eb 20px)",
-          border: "1px solid #d1d5db",
-          opacity: 0.9,
+          backgroundColor: "#f3f4f6", // Solid Light Gray
+          border: "none",
+          opacity: 1,
           color: "#6b7280",
           borderRadius: "4px",
           fontSize: "0.75rem",
@@ -379,12 +380,10 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           </div>
           <div className="flex items-center gap-2">
             <div
-              className="w-4 h-4 rounded"
-              style={{
-                background: "repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 4px, #e5e7eb 4px, #e5e7eb 8px)",
-                border: "1px solid #d1d5db"
-              }}
-            />
+              className="w-4 h-4 rounded flex items-center justify-center bg-[#f3f4f6]"
+            >
+              <Lock className="h-3 w-3 text-muted-foreground opacity-50" />
+            </div>
             <span className="text-sm text-muted-foreground">Ofis Kapalı</span>
           </div>
         </div>
