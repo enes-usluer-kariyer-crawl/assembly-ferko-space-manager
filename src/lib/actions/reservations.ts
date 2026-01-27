@@ -44,6 +44,10 @@ export type Reservation = {
     id: string;
     name: string;
   };
+  profiles: {
+    full_name: string | null;
+    email: string;
+  } | null;
 };
 
 export type GetReservationsParams = {
@@ -79,6 +83,10 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
       rooms (
         id,
         name
+      ),
+      profiles (
+        full_name,
+        email
       )
     `
     )
@@ -113,6 +121,7 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
   const reservations = (data ?? []).map((item) => ({
     ...item,
     rooms: item.rooms as unknown as { id: string; name: string },
+    profiles: item.profiles as unknown as { full_name: string | null; email: string } | null,
   })) as Reservation[];
 
   return {

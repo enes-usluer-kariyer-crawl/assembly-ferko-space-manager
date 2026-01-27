@@ -12,7 +12,13 @@ import { NewReservationDialog } from "./NewReservationDialog";
 import { ReservationDetailDialog } from "./ReservationDetailDialog";
 import { CalendarToolbar } from "./CalendarToolbar";
 import { Button } from "@/components/ui/button";
-import { Plus, Coffee, Repeat } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Plus, Coffee, Repeat, Ban } from "lucide-react";
 
 const locales = {
   "tr": tr,
@@ -50,39 +56,99 @@ type CalendarEvent = {
     tags?: string[];
     cateringRequested?: boolean;
     isRecurring?: boolean;
+    userName?: string;
+    // For big_event_block: the name of the main event that caused the block
+    blockedByEventName?: string;
   };
 };
 
-// Custom event component to show icons
+// Custom event component with tooltips for all events
 function EventComponent({ event }: { event: CalendarEvent }) {
   const tags = event.resource.tags || [];
   const isBigEventBlock = tags.includes("big_event_block");
+  const isBigEvent = tags.includes("big_event");
 
-  // Simplified view for Big Event blocks
+  // Big Event Block: Minimal container with just an icon, tooltip shows details
   if (isBigEventBlock) {
+    // Extract the main event name from the description (format: "Blocked due to Big Event: [name]")
+    const mainEventName = event.resource.blockedByEventName ||
+      (event.resource.description?.replace("Blocked due to Big Event: ", "") ?? "Büyük Etkinlik");
+
     return (
-      <div className="flex items-center justify-center h-full text-center">
-        <span className="text-xs font-medium">⛔ KAPALI</span>
-      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center justify-center h-full w-full cursor-default">
+            <Ban className="h-4 w-4 text-gray-400" />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <div className="font-semibold text-destructive">Ofis Kapalı</div>
+          <div className="text-sm text-muted-foreground">{mainEventName}</div>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
   const displayTitle = event.title.replace(` (${event.resource.roomName})`, "");
-  return (
-    <div className="flex items-center gap-1 overflow-hidden">
-      <span className="truncate">{displayTitle}</span>
-      {event.resource.cateringRequested && (
-        <span title="İkram talep edildi">
+  const userName = event.resource.userName;
+
+  // Standard event content
+  const eventContent = (
+    <div className="flex flex-col gap-0.5 overflow-hidden h-full py-0.5">
+      {/* Title (bold) */}
+      <div className="flex items-center gap-1">
+        <span className="font-semibold truncate text-sm">{displayTitle}</span>
+        {event.resource.cateringRequested && (
           <Coffee className="h-3 w-3 flex-shrink-0" />
-        </span>
-      )}
-      {event.resource.isRecurring && (
-        <span title="Tekrarlayan etkinlik">
+        )}
+        {event.resource.isRecurring && (
           <Repeat className="h-3 w-3 flex-shrink-0" />
-        </span>
+        )}
+      </div>
+      {/* User name (small) - only show if not a big event */}
+      {userName && !isBigEvent && (
+        <span className="text-xs opacity-75 truncate">{userName}</span>
       )}
-      <span className="text-xs opacity-75 flex-shrink-0">({event.resource.roomName})</span>
     </div>
+  );
+
+  // Tooltip with full details
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="h-full w-full">{eventContent}</div>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-sm">
+        <div className="space-y-1">
+          <div className="font-semibold">{displayTitle}</div>
+          <div className="text-sm">
+            <span className="text-muted-foreground">Oda:</span> {event.resource.roomName}
+          </div>
+          {userName && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Kişi:</span> {userName}
+            </div>
+          )}
+          {event.resource.description && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Açıklama:</span> {event.resource.description}
+            </div>
+          )}
+          {event.resource.cateringRequested && (
+            <div className="text-sm flex items-center gap-1">
+              <Coffee className="h-3 w-3" />
+              <span>İkram talep edildi</span>
+            </div>
+          )}
+          {event.resource.isRecurring && (
+            <div className="text-sm flex items-center gap-1">
+              <Repeat className="h-3 w-3" />
+              <span>Tekrarlayan etkinlik</span>
+            </div>
+          )}
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -104,21 +170,27 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
 
   // Convert reservations to calendar events
   const events: CalendarEvent[] = useMemo(() => {
-    return reservations.map((reservation) => ({
-      id: reservation.id,
-      title: `${reservation.title} (${reservation.rooms.name})`,
-      start: new Date(reservation.start_time),
-      end: new Date(reservation.end_time),
-      resource: {
-        roomName: reservation.rooms.name,
-        roomId: reservation.room_id,
-        status: reservation.status,
-        description: reservation.description,
-        tags: reservation.tags,
-        cateringRequested: reservation.catering_requested,
-        isRecurring: reservation.is_recurring,
-      },
-    }));
+    return reservations.map((reservation) => {
+      // Get user display name from profile
+      const userName = reservation.profiles?.full_name || reservation.profiles?.email || undefined;
+
+      return {
+        id: reservation.id,
+        title: `${reservation.title} (${reservation.rooms.name})`,
+        start: new Date(reservation.start_time),
+        end: new Date(reservation.end_time),
+        resource: {
+          roomName: reservation.rooms.name,
+          roomId: reservation.room_id,
+          status: reservation.status,
+          description: reservation.description,
+          tags: reservation.tags,
+          cateringRequested: reservation.catering_requested,
+          isRecurring: reservation.is_recurring,
+          userName,
+        },
+      };
+    });
   }, [reservations]);
 
   // Event style getter for color-coding by room and status
@@ -129,19 +201,19 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
     const isBigEventBlock = tags.includes("big_event_block");
     const isBigEvent = tags.includes("big_event");
 
-    // Big Event Block: Grey striped pattern, unclickable
+    // Big Event Block: Grey striped pattern, lower z-index than main event
     if (isBigEventBlock) {
       return {
         style: {
           background: "repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 10px, #e5e7eb 10px, #e5e7eb 20px)",
           border: "1px solid #d1d5db",
-          opacity: 1,
+          opacity: 0.9,
           color: "#6b7280",
           borderRadius: "4px",
           fontSize: "0.75rem",
           fontWeight: 500,
-          pointerEvents: "none" as const,
           cursor: "default",
+          zIndex: 1, // Lower z-index so main Big Event appears on top
         },
       };
     }
@@ -247,6 +319,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
   (BookingCalendar as typeof BookingCalendar & { updateReservations?: typeof updateReservations }).updateReservations = updateReservations;
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="h-full flex flex-col">
       {/* Header with New Reservation button */}
       <div className="flex justify-between items-center mb-4">
@@ -365,5 +438,6 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
         event={selectedEvent}
       />
     </div>
+    </TooltipProvider>
   );
 }
