@@ -3,7 +3,8 @@
 import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, dateFnsLocalizer, Views, SlotInfo } from "react-big-calendar";
-import { format, parse, startOfWeek, getDay, differenceInMinutes } from "date-fns";
+import { format, parse, startOfWeek, getDay, differenceInMinutes, areIntervalsOverlapping } from "date-fns";
+import { toast } from "sonner";
 import { tr } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
@@ -18,7 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Plus, Coffee, Repeat, Lock } from "lucide-react";
+import { Plus, Coffee, Repeat } from "lucide-react";
 
 const locales = {
   "tr": tr,
@@ -56,32 +57,8 @@ type CalendarEvent = {
 
 // Custom event component with tooltips for all events
 function EventComponent({ event }: { event: CalendarEvent }) {
-  const tags = event.resource.tags || [];
-  const isBigEventBlock = tags.includes("big_event_block");
-
   const duration = differenceInMinutes(event.end, event.start);
   const isShort = duration <= 45;
-
-  // Big Event Block: Minimal container with just an icon, tooltip shows details
-  if (isBigEventBlock) {
-    const mainEventName = event.resource.blockedByEventName ||
-      (event.resource.description?.replace("Blocked due to Big Event: ", "") ?? "Büyük Etkinlik");
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="flex items-center justify-center h-full w-full cursor-default opacity-50">
-            <Lock className="h-4 w-4 text-muted-foreground" />
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
-          <div className="font-medium">Ofis Kapalı <span className="text-muted-foreground">({mainEventName})</span></div>
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  // Standard event content - Cleaned up
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -161,7 +138,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
   // Convert reservations to calendar events
-  const events: CalendarEvent[] = useMemo(() => {
+  const allEvents: CalendarEvent[] = useMemo(() => {
     return reservations.map((reservation) => {
       // Get user display name from profile
       const userName = reservation.profiles?.full_name || reservation.profiles?.email || undefined;
@@ -190,25 +167,39 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
     });
   }, [reservations]);
 
-  // Event style getter for color-coding by room
-  const eventStyleGetter = useCallback((event: CalendarEvent) => {
-    const tags = event.resource.tags || [];
-    const isBigEventBlock = tags.includes("big_event_block");
+  // Filter out "Blocked" events (big_event_block) - don't render as cards
+  const visibleEvents = useMemo(() => {
+    return allEvents.filter(e => e.title !== 'Ofis Kapalı');
+  }, [allEvents]);
 
-    // Big Event Block: Solid light gray background, no border
-    if (isBigEventBlock) {
+  // Get big event time ranges for hatched background
+  const bigEventRanges = useMemo(() => {
+    return allEvents
+      .filter(e => (e.resource.tags || []).includes("big_event_block"))
+      .map(e => ({ start: e.start, end: e.end }));
+  }, [allEvents]);
+
+  // Slot style getter for hatched background on blocked time slots
+  const slotPropGetter = useCallback((date: Date) => {
+    // Check if this slot falls within any big event range
+    const isBlocked = bigEventRanges.some(range =>
+      date >= range.start && date < range.end
+    );
+
+    if (isBlocked) {
       return {
         style: {
-          backgroundColor: "#f3f4f6",
-          border: "none",
-          opacity: 1,
-          color: "#6b7280",
-          borderRadius: "4px",
-          cursor: "default",
-        },
+          background: 'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 10px, #e5e7eb 10px, #e5e7eb 20px)',
+          pointerEvents: 'none' as const
+        }
       };
     }
 
+    return {};
+  }, [bigEventRanges]);
+
+  // Event style getter for color-coding by room
+  const eventStyleGetter = useCallback((event: CalendarEvent) => {
     let backgroundColor = '#3b82f6'; // Default Blue (Büyük Oda)
 
     switch (event.room) {
@@ -234,17 +225,22 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           opacity: 0.7,
           border: '2px dashed #fff',
           color: 'white',
-          borderRadius: '6px'
+          borderRadius: '6px',
+          zIndex: 10,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
         }
       };
     }
 
+    // Main events: high zIndex and shadow to float above striped background
     return {
       style: {
         backgroundColor,
         color: 'white',
         borderRadius: '6px',
-        border: 'none'
+        border: 'none',
+        zIndex: 10,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
       }
     };
   }, []);
@@ -255,13 +251,25 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
       router.push("/login?next=/");
       return;
     }
+
+    // Check if selected slot overlaps with any Big Event blocked time range
+    const selectedInterval = { start: slotInfo.start, end: slotInfo.end };
+    const isOverlappingBigEvent = bigEventRanges.some(range =>
+      areIntervalsOverlapping(selectedInterval, range)
+    );
+
+    if (isOverlappingBigEvent) {
+      toast.error("Bu saat aralığında ofis tamamen kapalıdır.");
+      return;
+    }
+
     // Note: In resource view, slotInfo might contain resourceId if we wanted to pre-select the room
     setSelectedSlot({
       start: slotInfo.start,
       end: slotInfo.end,
     });
     setDialogOpen(true);
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, bigEventRanges]);
 
   // Handle event selection (clicking on existing event)
   const handleSelectEvent = useCallback((event: CalendarEvent) => {
@@ -348,7 +356,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
         <div className="flex-1 bg-background rounded-lg border" style={{ height: 'calc(100vh - 180px)' }}>
           <Calendar
             localizer={localizer}
-            events={events}
+            events={visibleEvents}
             startAccessor="start"
             endAccessor="end"
             date={currentDate}
@@ -359,6 +367,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
             onSelectSlot={handleSelectSlot}
             onSelectEvent={handleSelectEvent}
             eventPropGetter={eventStyleGetter}
+            slotPropGetter={slotPropGetter}
             min={new Date(0, 0, 0, 8, 0, 0)}
             max={new Date(0, 0, 0, 22, 0, 0)}
             step={30}
