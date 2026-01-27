@@ -12,7 +12,7 @@ import { NewReservationDialog } from "./NewReservationDialog";
 import { ReservationDetailDialog } from "./ReservationDetailDialog";
 import { CalendarToolbar } from "./CalendarToolbar";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Coffee, Repeat } from "lucide-react";
 
 const locales = {
   "tr": tr,
@@ -49,8 +49,30 @@ type CalendarEvent = {
     description: string | null;
     tags?: string[];
     cateringRequested?: boolean;
+    isRecurring?: boolean;
   };
 };
+
+// Custom event component to show icons
+function EventComponent({ event }: { event: CalendarEvent }) {
+  const displayTitle = event.title.replace(` (${event.resource.roomName})`, "");
+  return (
+    <div className="flex items-center gap-1 overflow-hidden">
+      <span className="truncate">{displayTitle}</span>
+      {event.resource.cateringRequested && (
+        <span title="İkram talep edildi">
+          <Coffee className="h-3 w-3 flex-shrink-0" />
+        </span>
+      )}
+      {event.resource.isRecurring && (
+        <span title="Tekrarlayan etkinlik">
+          <Repeat className="h-3 w-3 flex-shrink-0" />
+        </span>
+      )}
+      <span className="text-xs opacity-75 flex-shrink-0">({event.resource.roomName})</span>
+    </div>
+  );
+}
 
 type BookingCalendarProps = {
   initialReservations: Reservation[];
@@ -82,6 +104,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
         description: reservation.description,
         tags: reservation.tags,
         cateringRequested: reservation.catering_requested,
+        isRecurring: reservation.is_recurring,
       },
     }));
   }, [reservations]);
@@ -260,6 +283,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           }}
           components={{
             toolbar: CalendarToolbar,
+            event: EventComponent,
           }}
           style={{ height: "100%" }}
         />

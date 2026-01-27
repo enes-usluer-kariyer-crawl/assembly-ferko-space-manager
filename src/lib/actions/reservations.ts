@@ -38,6 +38,8 @@ export type Reservation = {
   tags: string[];
   catering_requested: boolean;
   is_recurring: boolean;
+  recurrence_pattern: "none" | "weekly";
+  parent_reservation_id: string | null;
   rooms: {
     id: string;
     name: string;
@@ -72,6 +74,8 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
       tags,
       catering_requested,
       is_recurring,
+      recurrence_pattern,
+      parent_reservation_id,
       rooms (
         id,
         name
@@ -165,7 +169,7 @@ export type CreateReservationInput = {
   endTime: string;
   tags?: string[];
   cateringRequested?: boolean;
-  isRecurring?: boolean;
+  recurrencePattern?: "none" | "weekly";
 };
 
 export type ConflictingReservation = {
@@ -190,7 +194,7 @@ export type CreateReservationResult = {
 export async function createReservation(
   input: CreateReservationInput
 ): Promise<CreateReservationResult> {
-  const { roomId, title, description, startTime, endTime, tags, cateringRequested, isRecurring } =
+  const { roomId, title, description, startTime, endTime, tags, cateringRequested, recurrencePattern } =
     input;
 
   // Validate required fields
@@ -316,7 +320,9 @@ export async function createReservation(
     }
   }
 
-  // Insert reservation
+  const isRecurring = recurrencePattern === "weekly";
+
+  // Insert main reservation
   const { data: reservation, error: insertError } = await supabase
     .from("reservations")
     .insert({
@@ -329,7 +335,9 @@ export async function createReservation(
       status,
       tags: tags ?? [],
       catering_requested: cateringRequested ?? false,
-      is_recurring: isRecurring ?? false,
+      is_recurring: isRecurring,
+      recurrence_pattern: recurrencePattern ?? "none",
+      parent_reservation_id: null,
     })
     .select("id")
     .single();
@@ -340,6 +348,71 @@ export async function createReservation(
       success: false,
       error: "Failed to create reservation. Please try again.",
     };
+  }
+
+  // Create recurring instances if weekly recurrence
+  if (isRecurring) {
+    const recurringInstances = [];
+    const startDate = new Date(startTime);
+    const endDate = new Date(endTime);
+
+    // Create 3 additional weeks (4 weeks total including the original)
+    for (let week = 1; week <= 3; week++) {
+      const recurringStart = new Date(startDate);
+      recurringStart.setDate(recurringStart.getDate() + (week * 7));
+
+      const recurringEnd = new Date(endDate);
+      recurringEnd.setDate(recurringEnd.getDate() + (week * 7));
+
+      recurringInstances.push({
+        room_id: roomId,
+        user_id: user.id,
+        title,
+        description: description ?? null,
+        start_time: recurringStart.toISOString(),
+        end_time: recurringEnd.toISOString(),
+        status,
+        tags: tags ?? [],
+        catering_requested: cateringRequested ?? false,
+        is_recurring: true,
+        recurrence_pattern: "weekly",
+        parent_reservation_id: reservation.id,
+      });
+    }
+
+    if (recurringInstances.length > 0) {
+      const { error: recurringError } = await supabase
+        .from("reservations")
+        .insert(recurringInstances);
+
+      if (recurringError) {
+        console.error("Error creating recurring instances:", recurringError);
+        // Don't fail the main reservation, just log the error
+      }
+    }
+  }
+
+  // Get user's name for notification
+  const { data: userProfile } = await supabase
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", user.id)
+    .single();
+
+  const userName = userProfile?.full_name || userProfile?.email || "Unknown User";
+
+  // Mock notification system: Log email notifications
+  if (status === "pending" || cateringRequested) {
+    const reasons = [];
+    if (status === "pending") reasons.push("requires approval");
+    if (cateringRequested) reasons.push("requests catering");
+
+    console.log(`[NOTIFICATION] Email sent to Oylum Çevik: New Request from ${userName} (${reasons.join(", ")})`);
+    console.log(`  - Title: ${title}`);
+    console.log(`  - Room: ${roomId}`);
+    console.log(`  - Time: ${startTime} - ${endTime}`);
+    if (cateringRequested) console.log(`  - Catering: Requested`);
+    if (isRecurring) console.log(`  - Recurring: Weekly (4 weeks)`);
   }
 
   // For Big Events: Create blocked placeholder reservations for ALL OTHER ROOMS

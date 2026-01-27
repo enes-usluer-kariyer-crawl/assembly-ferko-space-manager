@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Clock, MapPin, FileText, Coffee } from "lucide-react";
+import { Clock, MapPin, FileText, Coffee, Repeat } from "lucide-react";
 
 type ReservationDetailDialogProps = {
   open: boolean;
@@ -25,6 +25,7 @@ type ReservationDetailDialogProps = {
       description: string | null;
       tags?: string[];
       cateringRequested?: boolean;
+      isRecurring?: boolean;
     };
   } | null;
 };
@@ -120,6 +121,14 @@ export function ReservationDetailDialog({
             <div className="flex items-center gap-3 text-muted-foreground">
               <Coffee className="h-5 w-5 flex-shrink-0" />
               <span className="text-foreground">İkram talep edildi</span>
+            </div>
+          )}
+
+          {/* Recurring */}
+          {event.resource.isRecurring && (
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <Repeat className="h-5 w-5 flex-shrink-0" />
+              <span className="text-foreground">Tekrarlayan etkinlik (Her Hafta)</span>
             </div>
           )}
 

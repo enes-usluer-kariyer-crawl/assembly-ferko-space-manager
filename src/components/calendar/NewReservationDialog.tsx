@@ -91,6 +91,7 @@ export function NewReservationDialog({
   const [endTime, setEndTime] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [cateringRequested, setCateringRequested] = useState(false);
+  const [recurrencePattern, setRecurrencePattern] = useState<"none" | "weekly">("none");
 
   // Reset form when dialog opens/closes or initial times change
   useEffect(() => {
@@ -101,6 +102,7 @@ export function NewReservationDialog({
       setRoomId("");
       setSelectedTags([]);
       setCateringRequested(false);
+      setRecurrencePattern("none");
 
       if (initialStartTime) {
         setStartDate(format(initialStartTime, "yyyy-MM-dd"));
@@ -174,6 +176,7 @@ export function NewReservationDialog({
         endTime: endDateTime,
         tags: selectedTags,
         cateringRequested,
+        recurrencePattern,
       });
 
       if (!result.success) {
@@ -306,6 +309,25 @@ export function NewReservationDialog({
             <p className="text-xs text-muted-foreground">
               Büyük etkinlikler tüm odaları bloke eder.
             </p>
+          </div>
+
+          {/* Recurrence */}
+          <div className="space-y-2">
+            <Label htmlFor="recurrence">Tekrarla</Label>
+            <Select value={recurrencePattern} onValueChange={(value: "none" | "weekly") => setRecurrencePattern(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tekrar seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Tekrarlanmıyor</SelectItem>
+                <SelectItem value="weekly">Her Hafta</SelectItem>
+              </SelectContent>
+            </Select>
+            {recurrencePattern === "weekly" && (
+              <p className="text-xs text-muted-foreground">
+                Bu rezervasyon 4 hafta boyunca her hafta aynı gün ve saatte tekrarlanacak.
+              </p>
+            )}
           </div>
 
           {/* Description */}
