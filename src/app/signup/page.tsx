@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -16,8 +17,20 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-const ALLOWED_DOMAINS_REGEX = /^[\w-.]+@(kariyer\.net|techcareer\.net|coens\.io)$/i;
+const DOMAIN_OPTIONS = [
+  { value: "@kariyer.net", label: "@kariyer.net" },
+  { value: "@techcareer.net", label: "@techcareer.net" },
+  { value: "@coens.io", label: "@coens.io" },
+  { value: "other", label: "Diğer" },
+];
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -30,8 +43,10 @@ function SubmitButton() {
 }
 
 export default function SignupPage() {
-  const [state, formAction] = useFormState(signup, undefined);
+  const [state, formAction] = useActionState(signup, undefined);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [selectedDomain, setSelectedDomain] = useState<string>("@kariyer.net");
+  const [customDomain, setCustomDomain] = useState<string>("");
   const router = useRouter();
 
   useEffect(() => {
@@ -42,15 +57,28 @@ export default function SignupPage() {
   }, [state, router]);
 
   const handleSubmit = (formData: FormData) => {
-    const email = formData.get("email") as string;
+    const username = formData.get("username") as string;
+    const domain = selectedDomain === "other" ? customDomain : selectedDomain;
+    const email = username + domain;
 
-    if (!ALLOWED_DOMAINS_REGEX.test(email)) {
-      setEmailError("Sadece kurumsal e-posta adresleri (kariyer.net, techcareer.net, coens.io) ile kayıt olabilirsiniz.");
+    if (!username.trim()) {
+      setEmailError("Kullanıcı adı gereklidir.");
+      return;
+    }
+
+    if (selectedDomain === "other" && !customDomain.startsWith("@")) {
+      setEmailError("Domain '@' ile başlamalıdır.");
       return;
     }
 
     setEmailError(null);
-    formAction(formData);
+
+    const newFormData = new FormData();
+    newFormData.set("email", email);
+    newFormData.set("password", formData.get("password") as string);
+    newFormData.set("full_name", formData.get("full_name") as string);
+
+    formAction(newFormData);
   };
 
   return (
@@ -76,14 +104,41 @@ export default function SignupPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="ornek@sirket.com"
-                required
-              />
+              <Label htmlFor="username">Email</Label>
+              <div className="flex gap-1">
+                <Input
+                  id="username"
+                  name="username"
+                  type="text"
+                  placeholder="ad.soyad"
+                  className="flex-1"
+                  required
+                />
+                <Select
+                  value={selectedDomain}
+                  onValueChange={setSelectedDomain}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Domain seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOMAIN_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedDomain === "other" && (
+                <Input
+                  type="text"
+                  placeholder="@domain.com"
+                  value={customDomain}
+                  onChange={(e) => setCustomDomain(e.target.value)}
+                  className="mt-2"
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Şifre</Label>

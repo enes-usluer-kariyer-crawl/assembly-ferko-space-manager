@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -16,6 +16,20 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const DOMAIN_OPTIONS = [
+  { value: "@kariyer.net", label: "@kariyer.net" },
+  { value: "@techcareer.net", label: "@techcareer.net" },
+  { value: "@coens.io", label: "@coens.io" },
+  { value: "other", label: "Diğer" },
+];
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -31,6 +45,34 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const nextUrl = searchParams.get("next") || "/";
   const [state, formAction] = useActionState(login, undefined);
+  const [selectedDomain, setSelectedDomain] = useState<string>("@kariyer.net");
+  const [customDomain, setCustomDomain] = useState<string>("");
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const handleSubmit = (formData: FormData) => {
+    const username = formData.get("username") as string;
+    const domain = selectedDomain === "other" ? customDomain : selectedDomain;
+    const email = username + domain;
+
+    if (!username.trim()) {
+      setEmailError("Kullanıcı adı gereklidir.");
+      return;
+    }
+
+    if (selectedDomain === "other" && !customDomain.startsWith("@")) {
+      setEmailError("Domain '@' ile başlamalıdır.");
+      return;
+    }
+
+    setEmailError(null);
+
+    const newFormData = new FormData();
+    newFormData.set("email", email);
+    newFormData.set("password", formData.get("password") as string);
+    newFormData.set("next", formData.get("next") as string);
+
+    formAction(newFormData);
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 dark:bg-gray-900 sm:px-6 lg:px-8">
@@ -44,17 +86,44 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="space-y-4">
+          <form action={handleSubmit} className="space-y-4">
             <input type="hidden" name="next" value={nextUrl} />
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="ornek@sirket.com"
-                required
-              />
+              <Label htmlFor="username">Email</Label>
+              <div className="flex gap-1">
+                <Input
+                  id="username"
+                  name="username"
+                  type="text"
+                  placeholder="ad.soyad"
+                  className="flex-1"
+                  required
+                />
+                <Select
+                  value={selectedDomain}
+                  onValueChange={setSelectedDomain}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Domain seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOMAIN_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedDomain === "other" && (
+                <Input
+                  type="text"
+                  placeholder="@domain.com"
+                  value={customDomain}
+                  onChange={(e) => setCustomDomain(e.target.value)}
+                  className="mt-2"
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Şifre</Label>
@@ -65,9 +134,9 @@ export default function LoginPage() {
                 required
               />
             </div>
-            {state?.error && (
+            {(state?.error || emailError) && (
               <div className="text-sm text-red-500 font-medium">
-                {state.error}
+                {emailError || state?.error}
               </div>
             )}
             <div className="pt-2">

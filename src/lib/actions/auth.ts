@@ -9,12 +9,37 @@ export type AuthState = {
   success?: boolean;
 } | undefined;
 
+const ALLOWED_DOMAINS = ['kariyer.net', 'techcareer.net', 'coens.io'];
+const ADMIN_WHITELIST = ['eusluer.eu@gmail.com'];
+
+function validateEmailDomain(email: string): { valid: boolean; error?: string } {
+  const domain = email.split('@')[1]?.toLowerCase();
+
+  if (ADMIN_WHITELIST.includes(email.toLowerCase())) {
+    return { valid: true };
+  }
+
+  if (!domain || !ALLOWED_DOMAINS.includes(domain)) {
+    return {
+      valid: false,
+      error: "Sadece onaylı kurumsal mailler veya yönetici hesabı giriş yapabilir."
+    };
+  }
+
+  return { valid: true };
+}
+
 export async function login(prevState: AuthState, formData: FormData) {
   const supabase = await createClient();
 
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const next = (formData.get("next") as string) || "/";
+
+  const validation = validateEmailDomain(email);
+  if (!validation.valid) {
+    return { error: validation.error };
+  }
 
   const { error } = await supabase.auth.signInWithPassword({
     email,
@@ -36,12 +61,9 @@ export async function signup(prevState: AuthState, formData: FormData) {
   const password = formData.get("password") as string;
   const full_name = formData.get("full_name") as string;
 
-  // Corporate email domain validation
-  const allowedDomains = ['kariyer.net', 'techcareer.net', 'coens.io'];
-  const emailDomain = email.split('@')[1]?.toLowerCase();
-
-  if (!emailDomain || !allowedDomains.includes(emailDomain)) {
-    return { error: "Yetkisiz e-posta uzantısı. Sadece kurumsal mailler kabul edilir." };
+  const validation = validateEmailDomain(email);
+  if (!validation.valid) {
+    return { error: validation.error };
   }
 
   console.log(`Signup started for email: ${email}`);
