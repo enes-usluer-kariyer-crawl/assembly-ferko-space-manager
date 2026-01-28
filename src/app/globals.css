@@ -173,7 +173,7 @@
   @apply h-0.5;
   background: transparent;
   border-top: 2px dashed hsl(var(--destructive));
-  z-index: 100 !important;
+  z-index: 10 !important;
   position: relative;
 }
 

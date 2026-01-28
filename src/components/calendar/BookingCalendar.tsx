@@ -396,6 +396,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
             defaultView={Views.WEEK}
             views={[Views.WEEK, Views.DAY]}
             selectable
+            scrollToTime={new Date()}
             onSelectSlot={handleSelectSlot}
             onSelectEvent={handleSelectEvent}
             eventPropGetter={eventStyleGetter}
