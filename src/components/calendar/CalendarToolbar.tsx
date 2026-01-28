@@ -23,9 +23,6 @@ export function CalendarToolbar({ date, onNavigate, onView, view }: ToolbarProps
 
   // Format the date based on the current view
   const getLabel = () => {
-    if (view === "month") {
-      return format(date, "MMMM yyyy", { locale: tr });
-    }
     if (view === "week") {
       return format(date, "MMMM yyyy", { locale: tr });
     }
@@ -71,14 +68,6 @@ export function CalendarToolbar({ date, onNavigate, onView, view }: ToolbarProps
 
       {/* Right side: View switcher */}
       <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-        <Button
-          variant={view === "month" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => onView("month" as View)}
-          className="px-3"
-        >
-          Ay
-        </Button>
         <Button
           variant={view === "week" ? "default" : "ghost"}
           size="sm"
