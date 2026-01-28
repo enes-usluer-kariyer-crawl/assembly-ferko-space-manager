@@ -191,3 +191,21 @@ export async function getCurrentUserWithAdminStatus() {
 
   return { user, isAdmin };
 }
+
+export async function verifyOtpCode(email: string, code: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.auth.verifyOtp({
+    email,
+    token: code,
+    type: 'email',
+  });
+
+  if (error) {
+    console.error('OTP Error:', error);
+    return { error: error.message };
+  }
+
+  // Başarılıysa dashboard'a yönlendir
+  redirect('/');
+}
