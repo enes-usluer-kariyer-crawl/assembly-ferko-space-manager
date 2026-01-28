@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { verifyOtpCode } from "@/lib/actions/auth";
 
 const allowedDomains = ["kariyer.net", "techcareer.net", "coens.io"];
+const CODE_EXPIRY_SECONDS = 5 * 60; // 5 dakika
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -13,8 +14,27 @@ export default function LoginPage() {
   const [step, setStep] = useState<"email" | "code">("email");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const [timeLeft, setTimeLeft] = useState(0);
 
   const fullEmail = `${username}@${selectedDomain}`;
+
+  // Geri sayım timer'ı
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  // Süre formatı: 4:59 gibi
+  const formatTime = useCallback((seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  }, []);
 
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +61,7 @@ export default function LoginPage() {
       setMsg("Hata: " + error.message);
     } else {
       setStep("code");
+      setTimeLeft(CODE_EXPIRY_SECONDS);
       setMsg("Mail kutuna gelen 8 haneli kodu gir.");
     }
   };
@@ -144,6 +165,37 @@ export default function LoginPage() {
             </form>
           ) : (
             <form onSubmit={handleVerifyCode} className="space-y-4">
+              {/* Geri Sayım */}
+              {timeLeft > 0 && (
+                <div className="flex items-center justify-center gap-2 text-sm">
+                  <svg
+                    className="w-4 h-4 text-slate-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span className="text-slate-600">
+                    Kod geçerlilik süresi:{" "}
+                    <span className="font-semibold text-slate-900">
+                      {formatTime(timeLeft)}
+                    </span>
+                  </span>
+                </div>
+              )}
+
+              {timeLeft === 0 && step === "code" && (
+                <div className="text-sm text-red-600 bg-red-50 p-2 rounded text-center">
+                  Kodun süresi doldu. Lütfen yeni kod isteyin.
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Doğrulama Kodu
@@ -155,13 +207,14 @@ export default function LoginPage() {
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   maxLength={8}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent text-center text-2xl tracking-widest"
+                  disabled={timeLeft === 0}
+                  className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent text-center text-2xl tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={loading || !code}
+                disabled={loading || !code || timeLeft === 0}
                 className="w-full py-2.5 px-4 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? (
@@ -191,10 +244,14 @@ export default function LoginPage() {
 
               <button
                 type="button"
-                onClick={() => setStep("email")}
+                onClick={() => {
+                  setStep("email");
+                  setCode("");
+                  setTimeLeft(0);
+                }}
                 className="w-full text-sm text-slate-500 hover:text-slate-900 transition-colors"
               >
-                Maili değiştir
+                {timeLeft === 0 ? "Yeni kod iste" : "Maili değiştir"}
               </button>
             </form>
           )}
