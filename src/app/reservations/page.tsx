@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { CalendarDays } from "lucide-react";
 
+import { CancelReservationButton } from "@/components/reservations/CancelReservationButton";
+
 export default async function ReservationsPage() {
   const supabase = await createClient();
 
@@ -50,46 +52,63 @@ export default async function ReservationsPage() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {reservations.map((reservation) => (
-            <div
-              key={reservation.id}
-              className="rounded-lg border bg-card p-4 shadow-sm"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-medium">{reservation.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {reservation.rooms?.name}
-                  </p>
+          {reservations.map((reservation) => {
+            const isFuture = new Date(reservation.start_time) > new Date();
+            const isCancellableStatus = ["pending", "approved"].includes(reservation.status);
+            const canCancel = isFuture && isCancellableStatus;
+
+            return (
+              <div
+                key={reservation.id}
+                className="rounded-lg border bg-card p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-medium">{reservation.title}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {reservation.rooms?.name}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {canCancel && (
+                      <CancelReservationButton reservationId={reservation.id} />
+                    )}
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        reservation.status === "approved"
+                          ? "bg-green-100 text-green-800"
+                          : reservation.status === "pending"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {reservation.status === "approved"
+                        ? "Onaylandı"
+                        : reservation.status === "pending"
+                        ? "Onay Bekliyor"
+                        : reservation.status === "cancelled"
+                        ? "İptal Edildi"
+                        : "Reddedildi"}
+                    </span>
+                  </div>
                 </div>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    reservation.status === "approved"
-                      ? "bg-green-100 text-green-800"
-                      : reservation.status === "pending"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {reservation.status === "approved" ? "Onaylandı" : reservation.status === "pending" ? "Onay Bekliyor" : "Reddedildi"}
-                </span>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {new Date(reservation.start_time).toLocaleDateString("tr-TR", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}{" "}
+                  -{" "}
+                  {new Date(reservation.end_time).toLocaleTimeString("tr-TR", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </div>
               </div>
-              <div className="mt-2 text-sm text-muted-foreground">
-                {new Date(reservation.start_time).toLocaleDateString("tr-TR", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}{" "}
-                -{" "}
-                {new Date(reservation.end_time).toLocaleTimeString("tr-TR", {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
