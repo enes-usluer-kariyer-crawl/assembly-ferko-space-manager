@@ -67,12 +67,7 @@ function EventComponent({ event }: { event: CalendarEvent }) {
           <div className={`font-bold truncate ${isShort ? 'text-[10px] leading-3' : 'text-xs'}`}>
             {event.title}
           </div>
-          {/* Owner: Always show if available, adjust size for short events */}
-          {event.resource.userName && (
-            <div className={`${isShort ? 'text-[9px] leading-3 opacity-85' : 'text-[10px] opacity-90'} truncate`}>
-              {event.resource.userName}
-            </div>
-          )}
+          {/* Owner: Hidden on card, visible in tooltip */}
           
           {/* Icons row - show for all events, smaller for short ones */}
           {(event.resource.isRecurring || event.resource.cateringRequested) && (
