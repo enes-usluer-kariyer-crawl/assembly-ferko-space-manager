@@ -400,8 +400,8 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
             onSelectEvent={handleSelectEvent}
             eventPropGetter={eventStyleGetter}
             slotPropGetter={slotPropGetter}
-            min={new Date(0, 0, 0, 8, 0, 0)}
-            max={new Date(0, 0, 0, 22, 0, 0)}
+            min={new Date(0, 0, 0, 0, 0, 0)}
+            max={new Date(0, 0, 0, 24, 0, 0)}
             step={30}
             timeslots={2}
             culture="tr"
