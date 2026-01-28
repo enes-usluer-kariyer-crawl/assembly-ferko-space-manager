@@ -173,19 +173,10 @@ export function ReservationDetailDialog({
               <span className="text-sm font-medium leading-none block">
                 Oluşturan
               </span>
-              {event.resource.userFullName || event.resource.userEmail ? (
-                <>
-                  {event.resource.userFullName && (
-                    <span className="text-sm text-foreground block">
-                      {event.resource.userFullName}
-                    </span>
-                  )}
-                  {event.resource.userEmail && (
-                    <span className="text-sm text-muted-foreground block">
-                      {event.resource.userEmail}
-                    </span>
-                  )}
-                </>
+              {event.resource.userEmail || event.resource.userFullName ? (
+                <span className="text-sm text-foreground block">
+                  {event.resource.userEmail || event.resource.userFullName}
+                </span>
               ) : (
                 <span className="text-sm text-muted-foreground italic block">
                   Unknown User
