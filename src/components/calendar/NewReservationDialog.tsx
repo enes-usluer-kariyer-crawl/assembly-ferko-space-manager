@@ -100,7 +100,6 @@ export function NewReservationDialog({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [cateringRequested, setCateringRequested] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState<"none" | "weekly">("none");
-  const [attendeeCount, setAttendeeCount] = useState<string>("");
 
   // Get tomorrow's date in YYYY-MM-DD format for min date validation
   const calculateMinDate = () => {
@@ -121,7 +120,6 @@ export function NewReservationDialog({
       setSelectedTags([]);
       setCateringRequested(false);
       setRecurrencePattern("none");
-      setAttendeeCount("");
 
       if (initialStartTime) {
         setStartDate(format(initialStartTime, "yyyy-MM-dd"));
@@ -149,14 +147,6 @@ export function NewReservationDialog({
     );
   };
 
-  // Get selected room and its capacity
-  const selectedRoom = rooms.find((r) => r.id === roomId);
-  const roomCapacity = selectedRoom ? ROOM_CAPACITIES[selectedRoom.name] ?? selectedRoom.capacity : null;
-
-  // Check if attendee count exceeds capacity
-  const attendeeCountNum = attendeeCount ? parseInt(attendeeCount, 10) : 0;
-  const exceedsCapacity = roomCapacity !== null && attendeeCountNum > roomCapacity;
-
   const handleFormAction = async (formData: FormData) => {
     setError(null);
     setBlockingConflicts(null);
@@ -169,7 +159,6 @@ export function NewReservationDialog({
     const formEndDate = formData.get("endDate") as string;
     const formEndTime = formData.get("endTime") as string;
     const formDescription = formData.get("description") as string;
-    const formAttendeeCount = formData.get("attendeeCount") as string;
 
     if (!formTitle?.trim()) {
       setError("Lütfen bir başlık girin.");
@@ -184,17 +173,6 @@ export function NewReservationDialog({
     if (!formStartDate || !formStartTime || !formEndDate || !formEndTime) {
       setError("Lütfen başlangıç ve bitiş tarih/saatini girin.");
       return;
-    }
-
-    // Validate attendee count against room capacity
-    const attendeeNum = formAttendeeCount ? parseInt(formAttendeeCount, 10) : 0;
-    const room = rooms.find((r) => r.id === formRoomId);
-    if (room && attendeeNum > 0) {
-      const capacity = ROOM_CAPACITIES[room.name] ?? room.capacity;
-      if (attendeeNum > capacity) {
-        setError(`Katılımcı sayısı (${attendeeNum}) odanın kapasitesini (${capacity}) aşıyor.`);
-        return;
-      }
     }
 
     // Construct Date objects from local inputs to handle timezone correctly
@@ -227,7 +205,6 @@ export function NewReservationDialog({
         tags: selectedTags,
         cateringRequested,
         recurrencePattern,
-        attendeeCount: attendeeNum > 0 ? attendeeNum : undefined,
       });
 
       if (!result.success) {
@@ -352,25 +329,6 @@ export function NewReservationDialog({
               </Select>
             </div>
 
-            {/* Attendee count */}
-            <div className="space-y-2">
-              <Label htmlFor="attendeeCount">Katılımcı Sayısı</Label>
-              <Input
-                id="attendeeCount"
-                name="attendeeCount"
-                type="number"
-                min="1"
-                value={attendeeCount}
-                onChange={(e) => setAttendeeCount(e.target.value)}
-                placeholder="Katılımcı sayısını girin"
-              />
-              {exceedsCapacity && (
-                <div className="p-3 text-sm text-yellow-800 bg-yellow-100 border border-yellow-300 rounded-md">
-                  Bu odanın kapasitesi {roomCapacity} kişidir. Lütfen daha büyük bir oda seçin.
-                </div>
-              )}
-            </div>
-
             {/* Date and Time Grid */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -493,7 +451,7 @@ export function NewReservationDialog({
 
           <DialogFooter className="mt-4">
             <CancelButton onCancel={() => onOpenChange(false)} />
-            <SubmitButton disabled={exceedsCapacity} />
+            <SubmitButton />
           </DialogFooter>
         </form>
       </DialogContent>

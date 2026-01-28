@@ -180,7 +180,6 @@ export type CreateReservationInput = {
   tags?: string[];
   cateringRequested?: boolean;
   recurrencePattern?: "none" | "weekly";
-  attendeeCount?: number;
 };
 
 export type ConflictingReservation = {
@@ -209,7 +208,7 @@ export type CreateReservationResult = {
 export async function createReservation(
   input: CreateReservationInput
 ): Promise<CreateReservationResult> {
-  const { roomId, title, description, startTime, endTime, tags, cateringRequested, recurrencePattern, attendeeCount } =
+  const { roomId, title, description, startTime, endTime, tags, cateringRequested, recurrencePattern } =
     input;
 
   // Validate required fields
@@ -295,17 +294,6 @@ export async function createReservation(
       success: false,
       error: "Seçilen oda rezervasyona açık değil.",
     };
-  }
-
-  // Validate attendee count against room capacity
-  if (attendeeCount && attendeeCount > 0) {
-    const roomCapacity = ROOM_CAPACITIES[room.name] ?? room.capacity;
-    if (attendeeCount > roomCapacity) {
-      return {
-        success: false,
-        error: `Katılımcı sayısı (${attendeeCount}) odanın kapasitesini (${roomCapacity}) aşıyor. Lütfen daha büyük bir oda seçin.`,
-      };
-    }
   }
 
   // Check availability using the existing availability check
