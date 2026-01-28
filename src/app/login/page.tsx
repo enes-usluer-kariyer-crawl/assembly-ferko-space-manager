@@ -8,9 +8,13 @@ import { verifyOtpCode } from "@/lib/actions/auth"; // Az önce yazdığımız s
 
 import { useRouter } from "next/navigation";
 
+const allowedDomains = ["kariyer.net", "techcareer.net", "coens.io"];
+
 export default function LoginPage() {
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+
+  const [selectedDomain, setSelectedDomain] = useState(allowedDomains[0]);
 
   const [code, setCode] = useState("");
 
@@ -22,11 +26,19 @@ export default function LoginPage() {
 
   const router = useRouter();
 
+  // Tam email adresini oluştur
+  const fullEmail = `${username}@${selectedDomain}`;
+
   // 1. ADIM: Maili Gönder (Client Side çağırıyoruz ki state yönetebilelim)
 
   const handleSendCode = async (e: React.FormEvent) => {
 
     e.preventDefault();
+
+    if (!username.trim()) {
+      setMsg("Lütfen kullanıcı adınızı girin.");
+      return;
+    }
 
     setLoading(true);
 
@@ -36,7 +48,7 @@ export default function LoginPage() {
 
     const { error } = await supabase.auth.signInWithOtp({
 
-      email,
+      email: fullEmail,
 
       options: {
 
@@ -78,7 +90,7 @@ export default function LoginPage() {
 
     // Server action'ı çağır
 
-    const res = await verifyOtpCode(email, code);
+    const res = await verifyOtpCode(fullEmail, code);
 
 
 
@@ -114,23 +126,47 @@ export default function LoginPage() {
 
           <form onSubmit={handleSendCode} className="space-y-4">
 
-            <div>
+            <div className="flex gap-2">
 
               <input
 
-                type="email"
+                type="text"
 
                 required
 
-                placeholder="ornek@kariyer.net"
+                placeholder="kullanici.adi"
 
-                value={email}
+                value={username}
 
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setUsername(e.target.value)}
 
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                className="flex-1 px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
 
               />
+
+              <span className="flex items-center text-gray-500 font-medium">@</span>
+
+              <select
+
+                value={selectedDomain}
+
+                onChange={(e) => setSelectedDomain(e.target.value)}
+
+                className="px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white cursor-pointer"
+
+              >
+
+                {allowedDomains.map((domain) => (
+
+                  <option key={domain} value={domain}>
+
+                    {domain}
+
+                  </option>
+
+                ))}
+
+              </select>
 
             </div>
 
