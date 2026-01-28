@@ -33,6 +33,8 @@ type ReservationDetailDialogProps = {
       isRecurring?: boolean;
       userId?: string;
       userName?: string;
+      userFullName?: string | null;
+      userEmail?: string;
     };
   } | null;
   currentUserId?: string;
@@ -165,15 +167,26 @@ export function ReservationDetailDialog({
           </div>
 
           {/* Creator */}
-          {event.resource.userName && (
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <User className="h-5 w-5 flex-shrink-0" />
-              <span className="text-foreground">
-                <span className="font-medium text-muted-foreground mr-1">Toplantı Sahibi:</span>
-                {event.resource.userName}
-              </span>
-            </div>
-          )}
+              {(event.resource.userFullName || event.resource.userEmail) && (
+                <div className="flex items-start gap-2">
+                  <User className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                  <div className="space-y-1">
+                    <span className="text-sm font-medium leading-none block">
+                      Oluşturan
+                    </span>
+                    {event.resource.userFullName && (
+                      <span className="text-sm text-foreground block">
+                        {event.resource.userFullName}
+                      </span>
+                    )}
+                    {event.resource.userEmail && (
+                      <span className="text-sm text-muted-foreground block">
+                        {event.resource.userEmail}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
           {/* Description */}
           {event.resource.description && (
