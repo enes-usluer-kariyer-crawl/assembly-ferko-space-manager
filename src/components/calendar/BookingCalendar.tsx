@@ -147,7 +147,8 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
   const allEvents: CalendarEvent[] = useMemo(() => {
     return reservations.map((reservation) => {
       // Get user display name from profile
-      const userName = reservation.profiles?.full_name || reservation.profiles?.email || undefined;
+      // Request: Show email instead of full name on cards
+      const userName = reservation.profiles?.email || reservation.profiles?.full_name || undefined;
 
       return {
         id: reservation.id,

@@ -349,7 +349,7 @@ export async function createReservation(
     // Query to find ALL existing active reservations in the time range (any room)
     const { data: existingBookings } = await supabase
       .from("reservations")
-      .select("id, title, room_id, start_time, end_time, rooms(name), profiles(full_name)")
+      .select("id, title, room_id, start_time, end_time, rooms(name), profiles(full_name, email)")
       .in("status", ["pending", "approved"])
       .not("tags", "cs", '{"big_event_block"}') // Exclude placeholder blocks
       .lt("start_time", endTime)
@@ -362,7 +362,7 @@ export async function createReservation(
         roomName: (booking.rooms as unknown as { name: string })?.name ?? "Unknown",
         startTime: booking.start_time,
         endTime: booking.end_time,
-        ownerName: (booking.profiles as unknown as { full_name: string | null })?.full_name ?? undefined,
+        ownerName: (booking.profiles as unknown as { email: string; full_name: string | null })?.email ?? (booking.profiles as unknown as { full_name: string | null })?.full_name ?? undefined,
       }));
 
       // BLOCKING: Do NOT create the reservation, return conflict data
