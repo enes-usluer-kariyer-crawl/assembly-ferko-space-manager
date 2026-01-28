@@ -56,7 +56,7 @@ export async function checkAvailability({
       console.error("Error checking big event availability:", bigEventError);
       return {
         available: false,
-        reason: "Failed to check availability. Please try again.",
+        reason: "Müsaitlik kontrol edilemedi. Lütfen tekrar deneyin.",
       };
     }
 
@@ -75,7 +75,7 @@ export async function checkAvailability({
       return {
         available: false,
         reason:
-          "Big Event reservations require all rooms to be available. Another booking exists during this time slot.",
+          "Büyük Etkinlik rezervasyonları için tüm odaların müsait olması gerekir. Bu saat aralığında başka bir rezervasyon var.",
         conflictingRoomId: conflictingReservation?.room_id,
         conflictingReservationId: conflictingReservation?.id,
       };
@@ -115,7 +115,7 @@ export async function checkAvailability({
 
     return {
       available: false,
-      reason: `This time slot is blocked by a Big Event: "${blockingReservation?.title ?? "Unknown"}". All rooms are reserved.`,
+      reason: `Bu saat aralığı Büyük Etkinlik tarafından bloklanmış: "${blockingReservation?.title ?? "Bilinmiyor"}". Tüm odalar rezerve edilmiş.`,
       conflictingRoomId: blockingReservation?.room_id,
       conflictingReservationId: blockingReservation?.id,
     };
@@ -138,7 +138,7 @@ export async function checkAvailability({
   if (blockedByPlaceholder) {
     return {
       available: false,
-      reason: `This time slot is blocked: "${blockedByPlaceholder.title}". A Big Event is in progress.`,
+      reason: `Bu saat aralığı bloklanmış: "${blockedByPlaceholder.title}". Büyük Etkinlik devam ediyor.`,
       conflictingRoomId: roomId,
       conflictingReservationId: blockedByPlaceholder.id,
     };

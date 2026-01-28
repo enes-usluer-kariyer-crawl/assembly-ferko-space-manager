@@ -11,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Assembly Space Manager",
-  description: "Premium space reservation management system",
+  title: "Assembly Ferko Alan Yönetimi",
+  description: "Toplantı odası rezervasyon yönetim sistemi",
 };
 
 export default async function RootLayout({
@@ -37,7 +37,7 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en">
+    <html lang="tr">
       <body className={`${inter.variable} font-sans antialiased`}>
         <ClientLayout user={user} isAdmin={isAdmin}>
           {children}

@@ -90,7 +90,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-semibold text-gray-700 tracking-wide">
-            Assembly Ferko <span className="text-gray-400 font-normal">Space</span>
+            Assembly Ferko <span className="text-gray-400 font-normal">Alan Yönetimi</span>
           </h1>
         </div>
 
@@ -281,7 +281,7 @@ export default function LoginPage() {
 
         {/* Bottom text */}
         <p className="text-center text-xs text-gray-500/80 mt-6">
-          Assembly Ferko Space Management
+          Assembly Ferko Alan Yönetimi
         </p>
       </div>
     </div>

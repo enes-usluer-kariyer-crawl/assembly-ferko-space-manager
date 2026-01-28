@@ -5,10 +5,10 @@ export default async function TestDbPage() {
 
   return (
     <div style={{ padding: "2rem", fontFamily: "monospace" }}>
-      <h1>Database Connection Test</h1>
+      <h1>Veritabanı Bağlantı Testi</h1>
       <hr />
 
-      <h2>getRooms() Result:</h2>
+      <h2>getRooms() Sonucu:</h2>
       <pre
         style={{
           background: result.success ? "#d4edda" : "#f8d7da",
@@ -20,24 +20,24 @@ export default async function TestDbPage() {
         {JSON.stringify(result, null, 2)}
       </pre>
 
-      <h2>Summary:</h2>
+      <h2>Özet:</h2>
       <ul>
         <li>
-          <strong>Success:</strong> {result.success ? "Yes" : "No"}
+          <strong>Başarılı:</strong> {result.success ? "Evet" : "Hayır"}
         </li>
         <li>
-          <strong>Rooms Found:</strong> {result.data?.length ?? 0}
+          <strong>Bulunan Oda Sayısı:</strong> {result.data?.length ?? 0}
         </li>
         {result.error && (
           <li>
-            <strong>Error:</strong> {result.error}
+            <strong>Hata:</strong> {result.error}
           </li>
         )}
       </ul>
 
       {result.data && result.data.length > 0 && (
         <>
-          <h2>Rooms List:</h2>
+          <h2>Oda Listesi:</h2>
           <table
             style={{
               borderCollapse: "collapse",
@@ -46,10 +46,10 @@ export default async function TestDbPage() {
           >
             <thead>
               <tr style={{ background: "#f0f0f0" }}>
-                <th style={{ border: "1px solid #ccc", padding: "8px" }}>Name</th>
-                <th style={{ border: "1px solid #ccc", padding: "8px" }}>Capacity</th>
-                <th style={{ border: "1px solid #ccc", padding: "8px" }}>Features</th>
-                <th style={{ border: "1px solid #ccc", padding: "8px" }}>Active</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>İsim</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>Kapasite</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>Özellikler</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>Aktif</th>
               </tr>
             </thead>
             <tbody>
@@ -58,10 +58,10 @@ export default async function TestDbPage() {
                   <td style={{ border: "1px solid #ccc", padding: "8px" }}>{room.name}</td>
                   <td style={{ border: "1px solid #ccc", padding: "8px" }}>{room.capacity}</td>
                   <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                    {room.features?.join(", ") || "None"}
+                    {room.features?.join(", ") || "Yok"}
                   </td>
                   <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                    {room.is_active ? "Yes" : "No"}
+                    {room.is_active ? "Evet" : "Hayır"}
                   </td>
                 </tr>
               ))}
@@ -72,7 +72,7 @@ export default async function TestDbPage() {
 
       <hr />
       <p style={{ color: "#666", fontSize: "0.9em" }}>
-        This is a diagnostic page. Visit <code>/test-db</code> to verify database connectivity.
+        Bu bir tanılama sayfasıdır. Veritabanı bağlantısını doğrulamak için <code>/test-db</code> adresini ziyaret edin.
       </p>
     </div>
   );

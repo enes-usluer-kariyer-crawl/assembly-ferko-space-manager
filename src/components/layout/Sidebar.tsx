@@ -20,12 +20,12 @@ interface SidebarProps {
 
 const navItems = [
   {
-    label: "Dashboard",
+    label: "Ana Sayfa",
     href: "/",
     icon: Home,
   },
   {
-    label: "My Reservations",
+    label: "Rezervasyonlarım",
     href: "/reservations",
     icon: CalendarDays,
   },
@@ -33,7 +33,7 @@ const navItems = [
 
 const adminItems = [
   {
-    label: "Admin Panel",
+    label: "Yönetim Paneli",
     href: "/admin/approvals",
     icon: Shield,
   },
@@ -45,7 +45,7 @@ export function Sidebar({ user, isAdmin }: SidebarProps) {
   const displayName =
     user?.user_metadata?.full_name ||
     user?.email?.split("@")[0] ||
-    "User";
+    "Kullanıcı";
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-[hsl(var(--sidebar-background))] text-[hsl(var(--sidebar-foreground))]">
@@ -65,7 +65,7 @@ export function Sidebar({ user, isAdmin }: SidebarProps) {
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3 py-4">
           <div className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-[hsl(var(--sidebar-muted-foreground))]">
-            Navigation
+            Navigasyon
           </div>
           {navItems.map((item) => {
             const isActive = pathname === item.href;
@@ -89,7 +89,7 @@ export function Sidebar({ user, isAdmin }: SidebarProps) {
           {isAdmin && (
             <>
               <div className="mb-2 mt-6 px-3 text-xs font-medium uppercase tracking-wider text-[hsl(var(--sidebar-muted-foreground))]">
-                Administration
+                Yönetim
               </div>
               {adminItems.map((item) => {
                 const isActive = pathname === item.href;

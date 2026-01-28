@@ -13,9 +13,9 @@ export default async function ReservationsPage() {
       <div className="p-6">
         <div className="rounded-lg border bg-card p-8 text-center">
           <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h2 className="mt-4 text-lg font-semibold">Sign in Required</h2>
+          <h2 className="mt-4 text-lg font-semibold">Giriş Gerekli</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Please sign in to view your reservations.
+            Rezervasyonlarınızı görüntülemek için lütfen giriş yapın.
           </p>
         </div>
       </div>
@@ -34,18 +34,18 @@ export default async function ReservationsPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">My Reservations</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Rezervasyonlarım</h1>
         <p className="text-sm text-muted-foreground">
-          View and manage your space reservations
+          Alan rezervasyonlarınızı görüntüleyin ve yönetin
         </p>
       </div>
 
       {!reservations || reservations.length === 0 ? (
         <div className="rounded-lg border bg-card p-8 text-center">
           <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h2 className="mt-4 text-lg font-semibold">No Reservations</h2>
+          <h2 className="mt-4 text-lg font-semibold">Rezervasyon Yok</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            You haven&apos;t made any reservations yet.
+            Henüz hiç rezervasyon yapmadınız.
           </p>
         </div>
       ) : (
@@ -71,11 +71,11 @@ export default async function ReservationsPage() {
                       : "bg-red-100 text-red-800"
                   }`}
                 >
-                  {reservation.status}
+                  {reservation.status === "approved" ? "Onaylandı" : reservation.status === "pending" ? "Onay Bekliyor" : "Reddedildi"}
                 </span>
               </div>
               <div className="mt-2 text-sm text-muted-foreground">
-                {new Date(reservation.start_time).toLocaleDateString("en-US", {
+                {new Date(reservation.start_time).toLocaleDateString("tr-TR", {
                   weekday: "short",
                   month: "short",
                   day: "numeric",
@@ -83,7 +83,7 @@ export default async function ReservationsPage() {
                   minute: "2-digit",
                 })}{" "}
                 -{" "}
-                {new Date(reservation.end_time).toLocaleTimeString("en-US", {
+                {new Date(reservation.end_time).toLocaleTimeString("tr-TR", {
                   hour: "numeric",
                   minute: "2-digit",
                 })}

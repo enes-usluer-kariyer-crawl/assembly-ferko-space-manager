@@ -113,7 +113,7 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
     console.error("Error fetching reservations:", error);
     return {
       success: false,
-      error: "Failed to fetch reservations.",
+      error: "Rezervasyonlar yüklenemedi.",
     };
   }
 
@@ -151,7 +151,7 @@ export async function getRooms(): Promise<{
       return {
         success: false,
         data: [],
-        error: `Failed to fetch rooms: ${error.message}`,
+        error: `Odalar yüklenemedi: ${error.message}`,
       };
     }
 
@@ -166,7 +166,7 @@ export async function getRooms(): Promise<{
     return {
       success: false,
       data: [],
-      error: `Unexpected error: ${errorMessage}`,
+      error: `Beklenmeyen hata: ${errorMessage}`,
     };
   }
 }
@@ -216,7 +216,7 @@ export async function createReservation(
   if (!roomId || !title || !startTime || !endTime) {
     return {
       success: false,
-      error: "Missing required fields: roomId, title, startTime, and endTime are required.",
+      error: "Gerekli alanlar eksik: Oda, başlık, başlangıç ve bitiş zamanı gereklidir.",
     };
   }
 
@@ -227,14 +227,14 @@ export async function createReservation(
   if (isNaN(start.getTime()) || isNaN(end.getTime())) {
     return {
       success: false,
-      error: "Invalid date format for startTime or endTime.",
+      error: "Başlangıç veya bitiş zamanı için geçersiz tarih formatı.",
     };
   }
 
   if (end <= start) {
     return {
       success: false,
-      error: "End time must be after start time.",
+      error: "Bitiş zamanı başlangıç zamanından sonra olmalıdır.",
     };
   }
 
@@ -272,7 +272,7 @@ export async function createReservation(
   if (userError || !user) {
     return {
       success: false,
-      error: "You must be logged in to create a reservation.",
+      error: "Rezervasyon oluşturmak için giriş yapmanız gerekiyor.",
     };
   }
 
@@ -286,14 +286,14 @@ export async function createReservation(
   if (roomError || !room) {
     return {
       success: false,
-      error: "Invalid room selected.",
+      error: "Geçersiz oda seçildi.",
     };
   }
 
   if (!room.is_active) {
     return {
       success: false,
-      error: "The selected room is not available for booking.",
+      error: "Seçilen oda rezervasyona açık değil.",
     };
   }
 
@@ -319,7 +319,7 @@ export async function createReservation(
   if (!availabilityResult.available) {
     return {
       success: false,
-      error: availabilityResult.reason ?? "The room is not available for the selected time slot.",
+      error: availabilityResult.reason ?? "Seçilen saat aralığında oda müsait değil.",
     };
   }
 
@@ -333,7 +333,7 @@ export async function createReservation(
   if (profileError || !profile) {
     return {
       success: false,
-      error: "Failed to retrieve user profile.",
+      error: "Kullanıcı profili alınamadı.",
     };
   }
 
@@ -401,7 +401,7 @@ export async function createReservation(
     console.error("Error creating reservation:", insertError);
     return {
       success: false,
-      error: "Failed to create reservation. Please try again.",
+      error: "Rezervasyon oluşturulamadı. Lütfen tekrar deneyin.",
     };
   }
 
@@ -534,14 +534,14 @@ export async function updateReservationStatus(
   if (!id) {
     return {
       success: false,
-      error: "Reservation ID is required.",
+      error: "Rezervasyon ID gereklidir.",
     };
   }
 
   if (status !== "approved" && status !== "rejected") {
     return {
       success: false,
-      error: "Status must be 'approved' or 'rejected'.",
+      error: "Durum 'onaylandı' veya 'reddedildi' olmalıdır.",
     };
   }
 
@@ -556,7 +556,7 @@ export async function updateReservationStatus(
   if (userError || !user) {
     return {
       success: false,
-      error: "You must be logged in to update a reservation.",
+      error: "Rezervasyonu güncellemek için giriş yapmanız gerekiyor.",
     };
   }
 
@@ -570,14 +570,14 @@ export async function updateReservationStatus(
   if (profileError || !profile) {
     return {
       success: false,
-      error: "Failed to retrieve user profile.",
+      error: "Kullanıcı profili alınamadı.",
     };
   }
 
   if (profile.role !== "admin") {
     return {
       success: false,
-      error: "Only administrators can update reservation status.",
+      error: "Sadece yöneticiler rezervasyon durumunu güncelleyebilir.",
     };
   }
 
@@ -591,7 +591,7 @@ export async function updateReservationStatus(
   if (reservationError || !reservation) {
     return {
       success: false,
-      error: "Reservation not found.",
+      error: "Rezervasyon bulunamadı.",
     };
   }
 
@@ -613,7 +613,7 @@ export async function updateReservationStatus(
     console.error("Error updating reservation status:", updateError);
     return {
       success: false,
-      error: "Failed to update reservation status.",
+      error: "Rezervasyon durumu güncellenemedi.",
     };
   }
 
@@ -677,7 +677,7 @@ export async function getPendingReservations(): Promise<{
     console.error("Error fetching pending reservations:", error);
     return {
       success: false,
-      error: "Failed to fetch pending reservations.",
+      error: "Bekleyen rezervasyonlar yüklenemedi.",
     };
   }
 
