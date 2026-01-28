@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, MapPin, FileText, Coffee, Repeat, X, User } from "lucide-react";
 import { cancelReservation } from "@/lib/actions/reservations";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type ReservationDetailDialogProps = {
   open: boolean;
@@ -91,6 +92,7 @@ export function ReservationDetailDialog({
   onCancelled,
 }: ReservationDetailDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   if (!event) return null;
 
@@ -111,11 +113,8 @@ export function ReservationDetailDialog({
   // Dynamic button label based on status
   const cancelButtonLabel = event.resource.status === "pending" ? "Talebi Geri Çek" : "İptal Et";
 
-  const handleCancel = async () => {
-    if (!window.confirm("Emin misiniz?")) {
-      return;
-    }
-
+  const handleConfirmCancel = async () => {
+    setShowConfirmDialog(false);
     setIsLoading(true);
     try {
       const result = await cancelReservation(event.id);
@@ -134,113 +133,126 @@ export function ReservationDetailDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px]">
-        <DialogHeader>
-          <div className="flex items-start justify-between gap-4">
-            <DialogTitle className="text-xl pr-4">{displayTitle}</DialogTitle>
-          </div>
-          <div className="pt-2 flex flex-wrap gap-2">
-            <StatusBadge status={event.resource.status} />
-            {isPastEvent && <PastEventBadge />}
-          </div>
-        </DialogHeader>
-
-        <div className="space-y-4 pt-2">
-          {/* Room */}
-          <div className="flex items-center gap-3 text-muted-foreground">
-            <MapPin className="h-5 w-5 flex-shrink-0" />
-            <span className="font-medium text-foreground">{event.resource.roomName}</span>
-          </div>
-
-          {/* Time */}
-          <div className="flex items-start gap-3 text-muted-foreground">
-            <Clock className="h-5 w-5 flex-shrink-0 mt-0.5" />
-            <div>
-              <div className="font-medium text-foreground">
-                {formatDateTime(event.start)}
-              </div>
-              <div className="text-sm">
-                — {formatDateTime(event.end)}
-              </div>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <div className="flex items-start justify-between gap-4">
+              <DialogTitle className="text-xl pr-4">{displayTitle}</DialogTitle>
             </div>
-          </div>
-
-          {/* Creator */}
-          <div className="flex items-start gap-2">
-            <User className="h-4 w-4 mt-0.5 text-muted-foreground" />
-            <div className="space-y-1">
-              <span className="text-sm font-medium leading-none block">
-                Oluşturan
-              </span>
-              {event.resource.userEmail || event.resource.userFullName ? (
-                <span className="text-sm text-foreground block">
-                  {event.resource.userEmail || event.resource.userFullName}
-                </span>
-              ) : (
-                <span className="text-sm text-muted-foreground italic block">
-                  Unknown User
-                </span>
-              )}
+            <div className="pt-2 flex flex-wrap gap-2">
+              <StatusBadge status={event.resource.status} />
+              {isPastEvent && <PastEventBadge />}
             </div>
-          </div>
+          </DialogHeader>
 
-          {/* Description */}
-          {event.resource.description && (
+          <div className="space-y-4 pt-2">
+            {/* Room */}
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <MapPin className="h-5 w-5 flex-shrink-0" />
+              <span className="font-medium text-foreground">{event.resource.roomName}</span>
+            </div>
+
+            {/* Time */}
             <div className="flex items-start gap-3 text-muted-foreground">
-              <FileText className="h-5 w-5 flex-shrink-0 mt-0.5" />
-              <p className="text-foreground">{event.resource.description}</p>
-            </div>
-          )}
-
-          {/* Catering */}
-          {event.resource.cateringRequested && (
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <Coffee className="h-5 w-5 flex-shrink-0" />
-              <span className="text-foreground">İkram talep edildi</span>
-            </div>
-          )}
-
-          {/* Recurring */}
-          {event.resource.isRecurring && (
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <Repeat className="h-5 w-5 flex-shrink-0" />
-              <span className="text-foreground">Tekrarlayan etkinlik (Her Hafta)</span>
-            </div>
-          )}
-
-          {/* Tags */}
-          {event.resource.tags && event.resource.tags.length > 0 && (
-            <div className="pt-2 border-t">
-              <div className="flex flex-wrap gap-2">
-                {event.resource.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-2 py-1 text-xs rounded-md bg-muted text-muted-foreground"
-                  >
-                    {tag}
-                  </span>
-                ))}
+              <Clock className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="font-medium text-foreground">
+                  {formatDateTime(event.start)}
+                </div>
+                <div className="text-sm">
+                  — {formatDateTime(event.end)}
+                </div>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Footer with Cancel Button */}
-        {canCancel && (
-          <DialogFooter className="pt-4 border-t">
-            <Button
-              variant="destructive"
-              onClick={handleCancel}
-              disabled={isLoading}
-              className="gap-2"
-            >
-              <X className="h-4 w-4" />
-              {isLoading ? "İptal ediliyor..." : cancelButtonLabel}
-            </Button>
-          </DialogFooter>
-        )}
-      </DialogContent>
-    </Dialog>
+            {/* Creator */}
+            <div className="flex items-start gap-2">
+              <User className="h-4 w-4 mt-0.5 text-muted-foreground" />
+              <div className="space-y-1">
+                <span className="text-sm font-medium leading-none block">
+                  Oluşturan
+                </span>
+                {event.resource.userEmail || event.resource.userFullName ? (
+                  <span className="text-sm text-foreground block">
+                    {event.resource.userEmail || event.resource.userFullName}
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground italic block">
+                    Unknown User
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Description */}
+            {event.resource.description && (
+              <div className="flex items-start gap-3 text-muted-foreground">
+                <FileText className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                <p className="text-foreground">{event.resource.description}</p>
+              </div>
+            )}
+
+            {/* Catering */}
+            {event.resource.cateringRequested && (
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Coffee className="h-5 w-5 flex-shrink-0" />
+                <span className="text-foreground">İkram talep edildi</span>
+              </div>
+            )}
+
+            {/* Recurring */}
+            {event.resource.isRecurring && (
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Repeat className="h-5 w-5 flex-shrink-0" />
+                <span className="text-foreground">Tekrarlayan etkinlik (Her Hafta)</span>
+              </div>
+            )}
+
+            {/* Tags */}
+            {event.resource.tags && event.resource.tags.length > 0 && (
+              <div className="pt-2 border-t">
+                <div className="flex flex-wrap gap-2">
+                  {event.resource.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-2 py-1 text-xs rounded-md bg-muted text-muted-foreground"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer with Cancel Button */}
+          {canCancel && (
+            <DialogFooter className="pt-4 border-t">
+              <Button
+                variant="destructive"
+                onClick={() => setShowConfirmDialog(true)}
+                disabled={isLoading}
+                className="gap-2"
+              >
+                <X className="h-4 w-4" />
+                {isLoading ? "İptal ediliyor..." : cancelButtonLabel}
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={showConfirmDialog}
+        onOpenChange={setShowConfirmDialog}
+        title="Rezervasyonu İptal Et"
+        description="Bu rezervasyonu iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz."
+        confirmText="Evet, İptal Et"
+        cancelText="Vazgeç"
+        variant="destructive"
+        onConfirm={handleConfirmCancel}
+      />
+    </>
   );
 }
