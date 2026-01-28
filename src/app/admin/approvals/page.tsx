@@ -95,10 +95,7 @@ export default async function AdminApprovalsPage() {
                   <tr key={reservation.id} className="hover:bg-muted/30">
                     <td className="p-4">
                       <div className="font-medium">
-                        {reservation.profiles.full_name || "İsimsiz"}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {reservation.profiles.email}
+                        {reservation.profiles.email || reservation.profiles.full_name || "İsimsiz"}
                       </div>
                     </td>
                     <td className="p-4">{reservation.rooms.name}</td>

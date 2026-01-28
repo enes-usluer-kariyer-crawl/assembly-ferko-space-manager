@@ -88,14 +88,9 @@ function EventComponent({ event }: { event: CalendarEvent }) {
           <div className="text-sm">
             <span className="text-muted-foreground">Oda:</span> {event.resource.roomName}
           </div>
-          {event.resource.userFullName && (
+          {(event.resource.userEmail || event.resource.userFullName) && (
             <div className="text-sm">
-              <span className="text-muted-foreground">Kişi:</span> {event.resource.userFullName}
-            </div>
-          )}
-          {event.resource.userEmail && (
-            <div className="text-sm">
-              <span className="text-muted-foreground">Email:</span> {event.resource.userEmail}
+              <span className="text-muted-foreground">Oluşturan:</span> {event.resource.userEmail || event.resource.userFullName}
             </div>
           )}
           {event.resource.description && (
