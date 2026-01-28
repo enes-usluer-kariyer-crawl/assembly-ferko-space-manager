@@ -79,50 +79,70 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{
+        background:
+          "linear-gradient(135deg, #e0f4ff 0%, #a7d8f0 25%, #89c4e8 50%, #c5b8e8 75%, #f0e6f5 100%)",
+      }}
+    >
+      <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-slate-900 rounded-xl mb-4">
-            <span className="text-xl font-bold text-white">F</span>
-          </div>
-          <h1 className="text-xl font-semibold text-slate-900">Assembly Ferko</h1>
-          <p className="text-sm text-slate-500 mt-1">Space Management</p>
+          <h1 className="text-2xl font-semibold text-gray-700 tracking-wide">
+            Assembly Ferko <span className="text-gray-400 font-normal">Space</span>
+          </h1>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-          <h2 className="text-lg font-medium text-slate-900 text-center mb-6">
-            {step === "email" ? "Giriş Yap" : "Kodu Girin"}
-          </h2>
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-blue-900/10 p-8">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+              {step === "email" ? "Hoş Geldiniz!" : "Doğrulama Kodu"}
+            </h1>
+            <p className="text-sm text-gray-500">
+              {step === "email"
+                ? "Devam etmek için giriş yapın"
+                : "Mail adresinize gönderilen kodu girin"}
+            </p>
+          </div>
 
+          {/* Message */}
           {msg && (
-            <p className="text-sm text-blue-600 bg-blue-50 p-2 rounded mb-4 text-center">
+            <p
+              className={`text-sm p-3 rounded-xl mb-4 text-center ${
+                msg.includes("Hata") || msg.includes("Hatalı") || msg.includes("doldu")
+                  ? "text-red-600 bg-red-50"
+                  : "text-blue-600 bg-blue-50"
+              }`}
+            >
               {msg}
             </p>
           )}
 
           {step === "email" ? (
+            /* Email Step */
             <form onSubmit={handleSendCode} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Kurumsal E-posta
                 </label>
-                <div className="flex">
+                <div className="flex rounded-xl border border-gray-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all overflow-hidden bg-white">
                   <input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="kullanici.adi"
-                    className="flex-1 min-w-0 px-3 py-2.5 bg-white border border-slate-300 rounded-l-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                    className="flex-1 min-w-0 px-4 py-3 bg-transparent border-0 focus:outline-none focus:ring-0 text-gray-900 placeholder-gray-400 text-sm"
                   />
-                  <span className="inline-flex items-center px-3 border-y border-slate-300 bg-slate-50 text-slate-500 text-sm">
+                  <span className="inline-flex items-center px-2 text-gray-400 text-sm">
                     @
                   </span>
                   <select
                     value={selectedDomain}
                     onChange={(e) => setSelectedDomain(e.target.value)}
-                    className="px-3 py-2.5 bg-white border border-slate-300 rounded-r-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent cursor-pointer"
+                    className="px-3 py-3 bg-transparent border-0 text-gray-600 focus:outline-none focus:ring-0 cursor-pointer text-sm"
                   >
                     {allowedDomains.map((domain) => (
                       <option key={domain} value={domain}>
@@ -136,7 +156,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || !username}
-                className="w-full py-2.5 px-4 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm shadow-lg shadow-blue-500/25"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -164,12 +184,13 @@ export default function LoginPage() {
               </button>
             </form>
           ) : (
+            /* Verification Code Step */
             <form onSubmit={handleVerifyCode} className="space-y-4">
-              {/* Geri Sayım */}
+              {/* Countdown Timer */}
               {timeLeft > 0 && (
-                <div className="flex items-center justify-center gap-2 text-sm">
+                <div className="flex items-center justify-center gap-2 text-sm bg-gray-50 py-2 px-4 rounded-xl">
                   <svg
-                    className="w-4 h-4 text-slate-500"
+                    className="w-4 h-4 text-gray-500"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -181,9 +202,9 @@ export default function LoginPage() {
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span className="text-slate-600">
+                  <span className="text-gray-600">
                     Kod geçerlilik süresi:{" "}
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-gray-900">
                       {formatTime(timeLeft)}
                     </span>
                   </span>
@@ -191,13 +212,13 @@ export default function LoginPage() {
               )}
 
               {timeLeft === 0 && step === "code" && (
-                <div className="text-sm text-red-600 bg-red-50 p-2 rounded text-center">
+                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-xl text-center">
                   Kodun süresi doldu. Lütfen yeni kod isteyin.
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Doğrulama Kodu
                 </label>
                 <input
@@ -208,14 +229,14 @@ export default function LoginPage() {
                   onChange={(e) => setCode(e.target.value)}
                   maxLength={8}
                   disabled={timeLeft === 0}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent text-center text-2xl tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-center text-2xl tracking-widest disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading || !code || timeLeft === 0}
-                className="w-full py-2.5 px-4 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm shadow-lg shadow-blue-500/25"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -248,8 +269,9 @@ export default function LoginPage() {
                   setStep("email");
                   setCode("");
                   setTimeLeft(0);
+                  setMsg("");
                 }}
-                className="w-full text-sm text-slate-500 hover:text-slate-900 transition-colors"
+                className="w-full text-sm text-gray-500 hover:text-gray-900 transition-colors py-2"
               >
                 {timeLeft === 0 ? "Yeni kod iste" : "Maili değiştir"}
               </button>
@@ -257,12 +279,9 @@ export default function LoginPage() {
           )}
         </div>
 
-        {/* Footer */}
-        <p className="text-center text-xs text-slate-400 mt-6">
-          Yardıma mı ihtiyacınız var?{" "}
-          <a href="#" className="text-slate-600 hover:text-slate-900">
-            Destek
-          </a>
+        {/* Bottom text */}
+        <p className="text-center text-xs text-gray-500/80 mt-6">
+          Assembly Ferko Space Management
         </p>
       </div>
     </div>
