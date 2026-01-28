@@ -34,7 +34,7 @@ export async function loginWithMagicLink(prevState: AuthState, formData: FormDat
     return { error: validation.error };
   }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const origin = 'https://assembly-ferko-space-manager-production.up.railway.app';
 
   try {
     const { data: isAllowed, error: rateLimitError } = await supabase.rpc('check_and_update_rate_limit', {
