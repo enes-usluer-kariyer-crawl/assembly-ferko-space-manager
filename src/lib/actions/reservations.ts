@@ -510,6 +510,47 @@ export async function createReservation(
     }
   }
 
+  // Handle Combined Rooms (e.g. Big Room -> blocks Training + Demo)
+  // These get a 30-minute buffer before and after
+  const subRoomNames = COMBINED_ROOMS[room.name];
+  if (subRoomNames && subRoomNames.length > 0) {
+    const { data: subRooms } = await supabase
+      .from("rooms")
+      .select("id")
+      .in("name", subRoomNames)
+      .eq("is_active", true);
+
+    if (subRooms && subRooms.length > 0) {
+      // Add 30 minute buffer
+      const bufferStart = new Date(start);
+      bufferStart.setMinutes(bufferStart.getMinutes() - 30);
+      
+      const bufferEnd = new Date(end);
+      bufferEnd.setMinutes(bufferEnd.getMinutes() + 30);
+
+      const blockedReservations = subRooms.map((subRoom) => ({
+        room_id: subRoom.id,
+        user_id: user.id,
+        title: "Kullanıma Kapalı",
+        description: `Bağlı oda rezervasyonu nedeniyle kapalı: ${title}`,
+        start_time: bufferStart.toISOString(),
+        end_time: bufferEnd.toISOString(),
+        status: "approved" as const,
+        tags: ["sub_room_block"],
+        catering_requested: false,
+        is_recurring: false,
+      }));
+
+      const { error: subBlockError } = await supabase
+        .from("reservations")
+        .insert(blockedReservations);
+
+      if (subBlockError) {
+        console.error("Error creating sub-room blocks:", subBlockError);
+      }
+    }
+  }
+
   // Revalidate paths to refresh data
   revalidatePath("/");
   revalidatePath("/reservations");
