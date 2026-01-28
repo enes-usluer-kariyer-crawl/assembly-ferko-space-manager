@@ -726,7 +726,7 @@ export async function cancelReservation(
   // Fetch the reservation to get the owner and end_time
   const { data: reservation, error: reservationError } = await supabase
     .from("reservations")
-    .select("id, user_id, status, start_time, end_time, room_id, rooms(name)")
+    .select("id, user_id, status, start_time, end_time, room_id, tags, rooms(name)")
     .eq("id", reservationId)
     .single();
 
@@ -792,7 +792,44 @@ export async function cancelReservation(
     };
   }
 
-  // --- CASCADE CANCELLATION LOGIC ---
+  // --- BIG EVENT CASCADE CANCELLATION LOG ---
+  // If this was a Big Event (which blocked all other rooms), cancel those blocks
+  const isBigEvent = isBigEventRequest(reservation.tags ?? []);
+  
+  if (isBigEvent) {
+    console.log("Cancelling Big Event blocks...");
+    // Find all placeholder blocks created by this event
+    // They are identified by:
+    // 1. Tag 'big_event_block'
+    // 2. Exact same time slot
+    // 3. Created by the same user (usually)
+    // 4. Active status
+    
+    const { data: blockedReservations } = await supabase
+      .from("reservations")
+      .select("id")
+      .contains("tags", ["big_event_block"])
+      .eq("start_time", reservation.start_time)
+      .eq("end_time", reservation.end_time)
+      .neq("status", "cancelled");
+
+    if (blockedReservations && blockedReservations.length > 0) {
+      const blockIds = blockedReservations.map(r => r.id);
+      
+      const { error: blockCancelError } = await supabase
+        .from("reservations")
+        .update({ status: "cancelled", updated_at: new Date().toISOString() })
+        .in("id", blockIds);
+
+      if (blockCancelError) {
+        console.error("Error cancelling Big Event blocks:", blockCancelError);
+      } else {
+        console.log(`Successfully cancelled ${blockIds.length} Big Event placeholder blocks.`);
+      }
+    }
+  }
+
+  // --- COMBINED ROOM CASCADE CANCELLATION LOG ---
   // If this is a Combined Room (Parent), cancel overlapping sub-room reservations
   try {
     const roomName = (reservation.rooms as unknown as { name: string })?.name;
