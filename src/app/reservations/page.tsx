@@ -31,6 +31,7 @@ export default async function ReservationsPage() {
       rooms (name)
     `)
     .eq("user_id", user.id)
+    .not("tags", "cs", '{"big_event_block"}')
     .order("start_time", { ascending: false });
 
   return (
