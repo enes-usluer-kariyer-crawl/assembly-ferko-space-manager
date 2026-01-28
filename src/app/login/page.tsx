@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { createClient } from "@/utils/supabase/client"; // Client tarafı supabase
+import { createClient } from "@/lib/supabase/client"; // Client tarafı supabase
 
 import { verifyOtpCode } from "@/lib/actions/auth"; // Az önce yazdığımız server action
 
