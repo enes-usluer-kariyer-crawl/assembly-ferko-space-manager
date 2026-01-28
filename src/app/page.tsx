@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { getReservations, getRooms } from "@/lib/actions/reservations";
+import { getReservations, getRooms, getPendingReservations } from "@/lib/actions/reservations";
 import { createClient } from "@/lib/supabase/server";
 import { CalendarPage } from "./CalendarPage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DoorOpen, CalendarDays, Zap } from "lucide-react";
+import { DoorOpen, CalendarDays, Clock } from "lucide-react";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -23,13 +23,15 @@ export default async function Home() {
     .single();
   isAdmin = profile?.role === "admin";
 
-  const [reservationsResult, roomsResult] = await Promise.all([
+  const [reservationsResult, roomsResult, pendingResult] = await Promise.all([
     getReservations(),
     getRooms(),
+    getPendingReservations(),
   ]);
 
   const reservations = reservationsResult.success ? reservationsResult.data ?? [] : [];
   const rooms = roomsResult.success ? roomsResult.data ?? [] : [];
+  const pendingCount = pendingResult.success ? pendingResult.data?.length ?? 0 : 0;
 
   // Calculate stats
   const availableRooms = rooms.length;
@@ -39,7 +41,8 @@ export default async function Home() {
 
   const upcomingEventsToday = reservations.filter((r) => {
     const startTime = new Date(r.start_time);
-    return startTime >= todayStart && startTime < todayEnd;
+    const isBlocked = (r.tags ?? []).includes("big_event_block");
+    return startTime >= todayStart && startTime < todayEnd && !isBlocked;
   }).length;
 
   return (
@@ -78,19 +81,18 @@ export default async function Home() {
           </CardContent>
         </Card>
 
-        {/* Card 3: Quick Action */}
-        <Card className="shadow-sm bg-primary/5 border-primary/20">
+        {/* Card 3: Pending Approvals */}
+        <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Hızlı İşlem
+              Onay Bekleyen Etkinlikler
             </CardTitle>
-            <Zap className="h-5 w-5 text-primary" />
+            <Clock className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Aşağıdaki takvimde boş bir alana tıklayarak veya{" "}
-              <span className="font-semibold text-primary">Yeni Rezervasyon</span>{" "}
-              butonuna basarak hızlıca rezervasyon oluşturun.
+            <div className="text-3xl font-bold">{pendingCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Onay bekliyor
             </p>
           </CardContent>
         </Card>
