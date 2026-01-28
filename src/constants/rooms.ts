@@ -9,6 +9,13 @@ export const ROOM_CAPACITIES: Record<string, number> = {
   'Masalı Oda': 6
 };
 
+// Mapping of Parent Room Name -> Child Room Names
+// When a parent room (Combined Room) is cancelled, these sub-rooms should also be released.
+// TODO: Verify the correct mapping for your specific room setup.
+export const COMBINED_ROOMS: Record<string, string[]> = {
+  'Büyük Oda': ['Eğitim Odası', 'Demo Odası'] 
+};
+
 // Helper function to get capacity by room name
 export function getRoomCapacity(roomName: string): number | undefined {
   return ROOM_CAPACITIES[roomName];

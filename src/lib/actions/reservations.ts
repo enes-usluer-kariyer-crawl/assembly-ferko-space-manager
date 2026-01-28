@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkAvailability } from "./availability";
-import { ROOM_CAPACITIES } from "@/constants/rooms";
+import { ROOM_CAPACITIES, COMBINED_ROOMS } from "@/constants/rooms";
 
 // Big Event tags that trigger global room lockout
 const BIG_EVENT_TAGS = [
@@ -726,7 +726,7 @@ export async function cancelReservation(
   // Fetch the reservation to get the owner and end_time
   const { data: reservation, error: reservationError } = await supabase
     .from("reservations")
-    .select("id, user_id, status, end_time")
+    .select("id, user_id, status, start_time, end_time, room_id, rooms(name)")
     .eq("id", reservationId)
     .single();
 
@@ -790,6 +790,56 @@ export async function cancelReservation(
       success: false,
       message: "Rezervasyon iptal edilirken bir hata oluştu.",
     };
+  }
+
+  // --- CASCADE CANCELLATION LOGIC ---
+  // If this is a Combined Room (Parent), cancel overlapping sub-room reservations
+  try {
+    const roomName = (reservation.rooms as unknown as { name: string })?.name;
+    const subRoomNames = COMBINED_ROOMS[roomName];
+
+    if (subRoomNames && subRoomNames.length > 0) {
+      console.log(`Checking cascade cancellation for parent room: ${roomName}`);
+
+      // 1. Get IDs of the sub-rooms
+      const { data: subRooms } = await supabase
+        .from("rooms")
+        .select("id")
+        .in("name", subRoomNames);
+
+      if (subRooms && subRooms.length > 0) {
+        const subRoomIds = subRooms.map((r) => r.id);
+
+        // 2. Find overlapping reservations in sub-rooms
+        // We look for reservations with EXACT matching times
+        const { data: childReservations } = await supabase
+          .from("reservations")
+          .select("id")
+          .in("room_id", subRoomIds)
+          .eq("start_time", reservation.start_time)
+          .eq("end_time", reservation.end_time)
+          .neq("status", "cancelled"); // Only cancel active ones
+
+        if (childReservations && childReservations.length > 0) {
+          const childReservationIds = childReservations.map((r) => r.id);
+
+          // 3. Cancel them
+          const { error: cascadeError } = await supabase
+            .from("reservations")
+            .update({ status: "cancelled", updated_at: new Date().toISOString() })
+            .in("id", childReservationIds);
+
+          if (cascadeError) {
+            console.error("Error in cascade cancellation:", cascadeError);
+          } else {
+            console.log(`Cascade cancelled ${childReservationIds.length} sub-room reservations.`);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Unexpected error in cascade cancellation logic:", err);
+    // Don't fail the main operation, as the main reservation was already cancelled
   }
 
   // Revalidate paths to refresh data
