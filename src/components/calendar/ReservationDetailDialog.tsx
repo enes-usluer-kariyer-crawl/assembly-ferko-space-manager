@@ -167,26 +167,32 @@ export function ReservationDetailDialog({
           </div>
 
           {/* Creator */}
-              {(event.resource.userFullName || event.resource.userEmail) && (
-                <div className="flex items-start gap-2">
-                  <User className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                  <div className="space-y-1">
-                    <span className="text-sm font-medium leading-none block">
-                      Oluşturan
+          <div className="flex items-start gap-2">
+            <User className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <div className="space-y-1">
+              <span className="text-sm font-medium leading-none block">
+                Oluşturan
+              </span>
+              {event.resource.userFullName || event.resource.userEmail ? (
+                <>
+                  {event.resource.userFullName && (
+                    <span className="text-sm text-foreground block">
+                      {event.resource.userFullName}
                     </span>
-                    {event.resource.userFullName && (
-                      <span className="text-sm text-foreground block">
-                        {event.resource.userFullName}
-                      </span>
-                    )}
-                    {event.resource.userEmail && (
-                      <span className="text-sm text-muted-foreground block">
-                        {event.resource.userEmail}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                  )}
+                  {event.resource.userEmail && (
+                    <span className="text-sm text-muted-foreground block">
+                      {event.resource.userEmail}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-sm text-muted-foreground italic block">
+                  Unknown User
+                </span>
               )}
+            </div>
+          </div>
 
           {/* Description */}
           {event.resource.description && (
