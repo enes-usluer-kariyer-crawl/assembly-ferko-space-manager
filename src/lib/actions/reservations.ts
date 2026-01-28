@@ -346,14 +346,28 @@ export async function createReservation(
   // For Big Events: Check for existing bookings that conflict and BLOCK creation
   // Admin must manually cancel these reservations first
   if (isBigEvent) {
+    // Calculate buffered times (30 mins before and after)
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    
+    const bufferStart = new Date(start);
+    bufferStart.setMinutes(bufferStart.getMinutes() - 30);
+    
+    const bufferEnd = new Date(end);
+    bufferEnd.setMinutes(bufferEnd.getMinutes() + 30);
+    
+    const bufferStartTime = bufferStart.toISOString();
+    const bufferEndTime = bufferEnd.toISOString();
+
     // Query to find ALL existing active reservations in the time range (any room)
+    // We check the BUFFERED range to ensure the entire block period is clear
     const { data: existingBookings } = await supabase
       .from("reservations")
       .select("id, title, room_id, start_time, end_time, rooms(name), profiles(full_name, email)")
       .in("status", ["pending", "approved"])
       .not("tags", "cs", '{"big_event_block"}') // Exclude placeholder blocks
-      .lt("start_time", endTime)
-      .gt("end_time", startTime);
+      .lt("start_time", bufferEndTime)
+      .gt("end_time", bufferStartTime);
 
     if (existingBookings && existingBookings.length > 0) {
       const conflicts: ConflictingReservation[] = existingBookings.map((booking) => ({
@@ -370,7 +384,7 @@ export async function createReservation(
         success: false,
         conflictType: "BLOCKING",
         conflictingEvents: conflicts,
-        error: `Bu saat aralığında ${conflicts.length} adet toplantı var. Blokaj koymak için önce bu toplantıların iptal edilmesi gerekmektedir.`,
+        error: `Bu saat aralığında (hazırlık süresi dahil) ${conflicts.length} adet toplantı var. Blokaj koymak için önce bu toplantıların iptal edilmesi gerekmektedir.`,
       };
     }
   }
@@ -481,9 +495,18 @@ export async function createReservation(
 
     if (otherRooms && otherRooms.length > 0) {
       // Create blocked reservations for each other room
-      // FIX: Use start/end strings directly to avoid timezone shifts
-      const blockStartTime = startTime;
-      const blockEndTime = endTime;
+      // Use buffered times calculated earlier
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+      
+      const bufferStart = new Date(start);
+      bufferStart.setMinutes(bufferStart.getMinutes() - 30);
+      
+      const bufferEnd = new Date(end);
+      bufferEnd.setMinutes(bufferEnd.getMinutes() + 30);
+      
+      const blockStartTime = bufferStart.toISOString();
+      const blockEndTime = bufferEnd.toISOString();
       
       const blockedReservations = otherRooms.map((otherRoom) => ({
         room_id: otherRoom.id,
@@ -506,47 +529,6 @@ export async function createReservation(
         console.error("Error creating blocked reservations:", blockInsertError);
         // Note: The main reservation was created successfully, so we don't fail the entire operation
         // but log the error for debugging
-      }
-    }
-  }
-
-  // Handle Combined Rooms (e.g. Big Room -> blocks Training + Demo)
-  // These get a 30-minute buffer before and after
-  const subRoomNames = COMBINED_ROOMS[room.name];
-  if (subRoomNames && subRoomNames.length > 0) {
-    const { data: subRooms } = await supabase
-      .from("rooms")
-      .select("id")
-      .in("name", subRoomNames)
-      .eq("is_active", true);
-
-    if (subRooms && subRooms.length > 0) {
-      // Add 30 minute buffer
-      const bufferStart = new Date(start);
-      bufferStart.setMinutes(bufferStart.getMinutes() - 30);
-      
-      const bufferEnd = new Date(end);
-      bufferEnd.setMinutes(bufferEnd.getMinutes() + 30);
-
-      const blockedReservations = subRooms.map((subRoom) => ({
-        room_id: subRoom.id,
-        user_id: user.id,
-        title: "Kullanıma Kapalı",
-        description: `Bağlı oda rezervasyonu nedeniyle kapalı: ${title}`,
-        start_time: bufferStart.toISOString(),
-        end_time: bufferEnd.toISOString(),
-        status: "approved" as const,
-        tags: ["sub_room_block"],
-        catering_requested: false,
-        is_recurring: false,
-      }));
-
-      const { error: subBlockError } = await supabase
-        .from("reservations")
-        .insert(blockedReservations);
-
-      if (subBlockError) {
-        console.error("Error creating sub-room blocks:", subBlockError);
       }
     }
   }
@@ -842,16 +824,28 @@ export async function cancelReservation(
     // Find all placeholder blocks created by this event
     // They are identified by:
     // 1. Tag 'big_event_block'
-    // 2. Exact same time slot
+    // 2. BUFFERED time slot (30 mins before/after)
     // 3. Created by the same user (usually)
     // 4. Active status
+    
+    const start = new Date(reservation.start_time);
+    const end = new Date(reservation.end_time);
+    
+    const bufferStart = new Date(start);
+    bufferStart.setMinutes(bufferStart.getMinutes() - 30);
+    
+    const bufferEnd = new Date(end);
+    bufferEnd.setMinutes(bufferEnd.getMinutes() + 30);
+    
+    const bufferStartTime = bufferStart.toISOString();
+    const bufferEndTime = bufferEnd.toISOString();
     
     const { data: blockedReservations } = await supabase
       .from("reservations")
       .select("id")
       .contains("tags", ["big_event_block"])
-      .eq("start_time", reservation.start_time)
-      .eq("end_time", reservation.end_time)
+      .eq("start_time", bufferStartTime)
+      .eq("end_time", bufferEndTime)
       .neq("status", "cancelled");
 
     if (blockedReservations && blockedReservations.length > 0) {
