@@ -141,6 +141,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
   const [currentDate, setCurrentDate] = useState(new Date());
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [selectedRoomFilter, setSelectedRoomFilter] = useState<string | null>(null);
 
   // Convert reservations to calendar events
   const allEvents: CalendarEvent[] = useMemo(() => {
@@ -173,9 +174,14 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
   }, [reservations]);
 
   // Filter out "Blocked" events (big_event_block) - don't render as cards
+  // Also filter by selected room if a room filter is active
   const visibleEvents = useMemo(() => {
-    return allEvents.filter(e => !(e.resource.tags || []).includes("big_event_block"));
-  }, [allEvents]);
+    let filtered = allEvents.filter(e => !(e.resource.tags || []).includes("big_event_block"));
+    if (selectedRoomFilter) {
+      filtered = filtered.filter(e => e.room === selectedRoomFilter);
+    }
+    return filtered;
+  }, [allEvents, selectedRoomFilter]);
 
   // Get big event time ranges for hatched background (from blocked placeholder events)
   const bigEventRanges = useMemo(() => {
@@ -333,28 +339,51 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           </Button>
         </div>
 
-        {/* Legend */}
-        <div className="flex flex-wrap gap-4 mb-4 px-1">
-          <div className="flex items-center gap-2">
+        {/* Legend - clickable for filtering */}
+        <div className="flex flex-wrap gap-4 mb-4 px-1 items-center">
+          {selectedRoomFilter && (
+            <button
+              onClick={() => setSelectedRoomFilter(null)}
+              className="flex items-center gap-2 px-2 py-1 rounded-md bg-primary/10 hover:bg-primary/20 transition-colors text-sm font-medium text-primary"
+            >
+              Tüm Odaları Göster
+            </button>
+          )}
+          <button
+            onClick={() => setSelectedRoomFilter(selectedRoomFilter === 'Büyük Oda' ? null : 'Büyük Oda')}
+            className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${selectedRoomFilter === 'Büyük Oda' ? 'bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-600' : 'hover:bg-muted'}`}
+          >
             <div className="w-3 h-3 rounded bg-blue-600"></div>
-            <span className="text-sm text-muted-foreground">Büyük Oda</span>
-          </div>
-          <div className="flex items-center gap-2">
+            <span className={`text-sm ${selectedRoomFilter === 'Büyük Oda' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>Büyük Oda</span>
+          </button>
+          <button
+            onClick={() => setSelectedRoomFilter(selectedRoomFilter === 'Demo Odası' ? null : 'Demo Odası')}
+            className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${selectedRoomFilter === 'Demo Odası' ? 'bg-orange-100 dark:bg-orange-900/30 ring-2 ring-orange-500' : 'hover:bg-muted'}`}
+          >
             <div className="w-3 h-3 rounded bg-amber-500"></div>
-            <span className="text-sm text-muted-foreground">Demo Odası</span>
-          </div>
-          <div className="flex items-center gap-2">
+            <span className={`text-sm ${selectedRoomFilter === 'Demo Odası' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>Demo Odası</span>
+          </button>
+          <button
+            onClick={() => setSelectedRoomFilter(selectedRoomFilter === 'Eğitim Odası' ? null : 'Eğitim Odası')}
+            className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${selectedRoomFilter === 'Eğitim Odası' ? 'bg-emerald-100 dark:bg-emerald-900/30 ring-2 ring-emerald-600' : 'hover:bg-muted'}`}
+          >
             <div className="w-3 h-3 rounded bg-emerald-600"></div>
-            <span className="text-sm text-muted-foreground">Eğitim Odası</span>
-          </div>
-          <div className="flex items-center gap-2">
+            <span className={`text-sm ${selectedRoomFilter === 'Eğitim Odası' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>Eğitim Odası</span>
+          </button>
+          <button
+            onClick={() => setSelectedRoomFilter(selectedRoomFilter === 'Koltuklu Oda' ? null : 'Koltuklu Oda')}
+            className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${selectedRoomFilter === 'Koltuklu Oda' ? 'bg-purple-100 dark:bg-purple-900/30 ring-2 ring-purple-600' : 'hover:bg-muted'}`}
+          >
             <div className="w-3 h-3 rounded bg-purple-600"></div>
-            <span className="text-sm text-muted-foreground">Koltuklu Oda</span>
-          </div>
-          <div className="flex items-center gap-2">
+            <span className={`text-sm ${selectedRoomFilter === 'Koltuklu Oda' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>Koltuklu Oda</span>
+          </button>
+          <button
+            onClick={() => setSelectedRoomFilter(selectedRoomFilter === 'Masalı Oda' ? null : 'Masalı Oda')}
+            className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${selectedRoomFilter === 'Masalı Oda' ? 'bg-rose-100 dark:bg-rose-900/30 ring-2 ring-rose-600' : 'hover:bg-muted'}`}
+          >
             <div className="w-3 h-3 rounded bg-rose-600"></div>
-            <span className="text-sm text-muted-foreground">Masalı Oda</span>
-          </div>
+            <span className={`text-sm ${selectedRoomFilter === 'Masalı Oda' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>Masalı Oda</span>
+          </button>
         </div>
 
         {/* Calendar */}

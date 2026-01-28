@@ -170,7 +170,22 @@
 }
 
 .rbc-current-time-indicator {
-  @apply bg-destructive h-0.5;
+  @apply h-0.5;
+  background: transparent;
+  border-top: 2px dashed hsl(var(--destructive));
+  z-index: 100 !important;
+  position: relative;
+}
+
+.rbc-current-time-indicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: hsl(var(--destructive));
 }
 
 /* Event styling */
