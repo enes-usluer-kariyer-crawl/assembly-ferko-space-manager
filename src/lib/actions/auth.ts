@@ -11,6 +11,16 @@ export type AuthState = {
 
 const ALLOWED_DOMAINS = ['kariyer.net', 'techcareer.net', 'coens.io'];
 
+// Test hesapları - magic link olmadan direkt giriş
+const TEST_ACCOUNTS: Record<string, { password: string; isAdmin: boolean }> = {
+  'eusluer.eu@kariyer.net': { password: 'test-user-password-2024', isAdmin: false },
+  'eusluer.eu@coens.io': { password: 'test-admin-password-2024', isAdmin: true },
+};
+
+function isTestAccount(email: string): boolean {
+  return email.toLowerCase() in TEST_ACCOUNTS;
+}
+
 function validateEmailDomain(email: string): { valid: boolean; error?: string } {
   const domain = email.split('@')[1]?.toLowerCase();
 
@@ -28,10 +38,70 @@ export async function loginWithMagicLink(prevState: AuthState, formData: FormDat
   const supabase = await createClient();
 
   const email = formData.get("email") as string;
+  const emailLower = email.toLowerCase();
 
   const validation = validateEmailDomain(email);
   if (!validation.valid) {
     return { error: validation.error };
+  }
+
+  // Test hesabı kontrolü - magic link olmadan direkt giriş
+  if (isTestAccount(emailLower)) {
+    const testAccount = TEST_ACCOUNTS[emailLower];
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: emailLower,
+      password: testAccount.password,
+    });
+
+    if (error) {
+      // Kullanıcı yoksa oluştur
+      if (error.message.includes('Invalid login credentials')) {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: emailLower,
+          password: testAccount.password,
+          options: {
+            data: {
+              is_test_account: true,
+            },
+          },
+        });
+
+        if (signUpError) {
+          return { error: signUpError.message };
+        }
+
+        // Tekrar giriş yap
+        const { error: retryError } = await supabase.auth.signInWithPassword({
+          email: emailLower,
+          password: testAccount.password,
+        });
+
+        if (retryError) {
+          return { error: retryError.message };
+        }
+      } else {
+        return { error: error.message };
+      }
+    }
+
+    // Admin ise profili güncelle
+    if (testAccount.isAdmin) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: user.id,
+            email: emailLower,
+            is_admin: true,
+            role: 'admin',
+          }, { onConflict: 'id' });
+      }
+    }
+
+    revalidatePath("/", "layout");
+    redirect("/");
   }
 
   const origin = 'https://assembly-ferko-space-manager-production.up.railway.app';
