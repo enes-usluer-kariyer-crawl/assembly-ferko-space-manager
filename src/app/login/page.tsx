@@ -108,17 +108,25 @@ export default function LoginPage() {
 
   return (
 
-    <div className="flex h-screen items-center justify-center bg-gray-50">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-8">
 
-      <div className="w-full max-w-md space-y-8 p-8 bg-white rounded-xl shadow-lg border border-gray-100 text-center">
+      <div className="w-full max-w-md space-y-6 p-6 sm:p-8 bg-white rounded-xl shadow-lg border border-gray-100 text-center">
 
+        <div className="space-y-2">
 
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
 
-        <h2 className="text-2xl font-bold text-gray-900">
+            Assembly Ferko Space Management
 
-          {step === "email" ? "Giriş Yap" : "Kodu Girin"}
+          </h1>
 
-        </h2>
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-700">
+
+            {step === "email" ? "Giriş Yap" : "Kodu Girin"}
+
+          </h2>
+
+        </div>
 
         {msg && <p className="text-sm text-blue-600 bg-blue-50 p-2 rounded">{msg}</p>}
 
@@ -126,7 +134,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSendCode} className="space-y-4">
 
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
 
               <input
 
@@ -144,29 +152,33 @@ export default function LoginPage() {
 
               />
 
-              <span className="flex items-center text-gray-500 font-medium">@</span>
+              <div className="flex items-center gap-2">
 
-              <select
+                <span className="text-gray-500 font-medium">@</span>
 
-                value={selectedDomain}
+                <select
 
-                onChange={(e) => setSelectedDomain(e.target.value)}
+                  value={selectedDomain}
 
-                className="px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white cursor-pointer"
+                  onChange={(e) => setSelectedDomain(e.target.value)}
 
-              >
+                  className="flex-1 sm:flex-none px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white cursor-pointer"
 
-                {allowedDomains.map((domain) => (
+                >
 
-                  <option key={domain} value={domain}>
+                  {allowedDomains.map((domain) => (
 
-                    {domain}
+                    <option key={domain} value={domain}>
 
-                  </option>
+                      {domain}
 
-                ))}
+                    </option>
 
-              </select>
+                  ))}
+
+                </select>
+
+              </div>
 
             </div>
 
