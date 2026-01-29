@@ -1,49 +1,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getPendingReservations, updateReservationStatus } from "@/lib/actions/reservations";
+import { getPendingReservations } from "@/lib/actions/reservations";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Repeat } from "lucide-react";
-import { revalidatePath } from "next/cache";
-
-async function ApprovalActions({ reservationId }: { reservationId: string }) {
-  async function approveAction() {
-    "use server";
-    const result = await updateReservationStatus(reservationId, "approved");
-    if (!result.success) {
-      console.error("Onaylama hatası:", result.error);
-    }
-    revalidatePath("/admin/approvals");
-    redirect("/admin/approvals");
-  }
-
-  async function rejectAction() {
-    "use server";
-    const result = await updateReservationStatus(reservationId, "rejected");
-    if (!result.success) {
-      console.error("Reddetme hatası:", result.error);
-    }
-    revalidatePath("/admin/approvals");
-    redirect("/admin/approvals");
-  }
-
-  return (
-    <div className="flex gap-2">
-      <form action={approveAction}>
-        <Button type="submit" size="sm" className="bg-green-600 hover:bg-green-700">
-          Onayla
-        </Button>
-      </form>
-      <form action={rejectAction}>
-        <Button type="submit" size="sm" variant="destructive">
-          Reddet
-        </Button>
-      </form>
-    </div>
-  );
-}
+import { ApprovalActions } from "./ApprovalActions";
 
 export default async function AdminApprovalsPage() {
   const supabase = await createClient();
