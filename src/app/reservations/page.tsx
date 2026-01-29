@@ -31,8 +31,10 @@ export default async function ReservationsPage() {
       rooms (name)
     `)
     .eq("user_id", user.id)
+    .in("status", ["pending", "approved"])
+    .gte("end_time", new Date().toISOString())
     .not("tags", "cs", '{"big_event_block"}')
-    .order("start_time", { ascending: false });
+    .order("start_time", { ascending: true });
 
   return (
     <div className="p-6">
