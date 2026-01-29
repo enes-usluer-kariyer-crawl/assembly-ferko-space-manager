@@ -748,6 +748,11 @@ export type CancelReservationResult = {
   message?: string;
 };
 
+export type CancelRecurringInstanceResult = {
+  success: boolean;
+  message?: string;
+};
+
 export async function cancelReservation(
   reservationId: string
 ): Promise<CancelReservationResult> {
@@ -950,5 +955,161 @@ export async function cancelReservation(
   return {
     success: true,
     message: "Rezervasyon başarıyla iptal edildi.",
+  };
+}
+
+/**
+ * Cancel a single instance of a recurring reservation by creating an exception record.
+ * This creates a cancelled child reservation for that specific date.
+ */
+export async function cancelRecurringInstance(
+  parentReservationId: string,
+  instanceDate: string
+): Promise<CancelRecurringInstanceResult> {
+  if (!parentReservationId || !instanceDate) {
+    return {
+      success: false,
+      message: "Rezervasyon ID ve tarih gereklidir.",
+    };
+  }
+
+  const supabase = await createClient();
+
+  // Get current user
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return {
+      success: false,
+      message: "Bu işlem için giriş yapmanız gerekiyor.",
+    };
+  }
+
+  // Fetch the parent reservation
+  const { data: parentReservation, error: parentError } = await supabase
+    .from("reservations")
+    .select("*")
+    .eq("id", parentReservationId)
+    .single();
+
+  if (parentError || !parentReservation) {
+    return {
+      success: false,
+      message: "Ana rezervasyon bulunamadı.",
+    };
+  }
+
+  // Verify this is a recurring reservation
+  if (!parentReservation.is_recurring || parentReservation.recurrence_pattern !== "weekly") {
+    return {
+      success: false,
+      message: "Bu rezervasyon haftalık tekrarlayan bir rezervasyon değil.",
+    };
+  }
+
+  // Get user's role to check admin status
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile) {
+    return {
+      success: false,
+      message: "Kullanıcı profili alınamadı.",
+    };
+  }
+
+  // Authorization check
+  const isOwner = parentReservation.user_id === user.id;
+  const isAdmin = profile.role === "admin";
+
+  if (!isOwner && !isAdmin) {
+    return {
+      success: false,
+      message: "Bunu yapmaya yetkiniz yok.",
+    };
+  }
+
+  // Calculate the instance times based on the selected date
+  const originalStart = new Date(parentReservation.start_time);
+  const originalEnd = new Date(parentReservation.end_time);
+  const duration = originalEnd.getTime() - originalStart.getTime();
+
+  const instanceStart = new Date(instanceDate);
+  // Preserve the original time (hour, minute)
+  instanceStart.setHours(originalStart.getHours(), originalStart.getMinutes(), 0, 0);
+  const instanceEnd = new Date(instanceStart.getTime() + duration);
+
+  // Check if this instance is in the past
+  if (instanceEnd < new Date()) {
+    return {
+      success: false,
+      message: "Geçmiş tarihlerdeki etkinlikler iptal edilemez.",
+    };
+  }
+
+  // Check if an exception already exists for this date
+  const { data: existingException } = await supabase
+    .from("reservations")
+    .select("id")
+    .eq("parent_reservation_id", parentReservationId)
+    .eq("start_time", instanceStart.toISOString())
+    .single();
+
+  if (existingException) {
+    // Update the existing exception to cancelled
+    const { error: updateError } = await supabase
+      .from("reservations")
+      .update({ status: "cancelled", updated_at: new Date().toISOString() })
+      .eq("id", existingException.id);
+
+    if (updateError) {
+      console.error("Error updating exception:", updateError);
+      return {
+        success: false,
+        message: "Rezervasyon iptal edilirken bir hata oluştu.",
+      };
+    }
+  } else {
+    // Create a new exception record (a cancelled child reservation)
+    const { error: insertError } = await supabase
+      .from("reservations")
+      .insert({
+        room_id: parentReservation.room_id,
+        user_id: parentReservation.user_id,
+        title: parentReservation.title,
+        description: parentReservation.description,
+        start_time: instanceStart.toISOString(),
+        end_time: instanceEnd.toISOString(),
+        status: "cancelled",
+        tags: parentReservation.tags ?? [],
+        catering_requested: parentReservation.catering_requested,
+        is_recurring: false,
+        recurrence_pattern: "none",
+        parent_reservation_id: parentReservationId,
+      });
+
+    if (insertError) {
+      console.error("Error creating exception:", insertError);
+      return {
+        success: false,
+        message: "Rezervasyon iptal edilirken bir hata oluştu.",
+      };
+    }
+  }
+
+  // Revalidate paths to refresh data
+  revalidatePath("/");
+  revalidatePath("/reservations");
+  revalidatePath("/calendar");
+
+  return {
+    success: true,
+    message: "Seçilen tarih için rezervasyon başarıyla iptal edildi.",
   };
 }
