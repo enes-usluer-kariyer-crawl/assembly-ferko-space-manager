@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Clock, MapPin, FileText, Coffee, Repeat, X, User } from "lucide-react";
-import { cancelReservation } from "@/lib/actions/reservations";
+import { cancelReservation, cancelRecurringInstance } from "@/lib/actions/reservations";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -32,6 +32,7 @@ type ReservationDetailDialogProps = {
       tags?: string[];
       cateringRequested?: boolean;
       isRecurring?: boolean;
+      parentReservationId?: string | null;
       userId?: string;
       userName?: string;
       userFullName?: string | null;
@@ -93,6 +94,7 @@ export function ReservationDetailDialog({
 }: ReservationDetailDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showRecurringDialog, setShowRecurringDialog] = useState(false);
 
   if (!event) return null;
 
@@ -113,13 +115,72 @@ export function ReservationDetailDialog({
   // Dynamic button label based on status
   const cancelButtonLabel = event.resource.status === "pending" ? "Talebi Geri Çek" : "İptal Et";
 
+  // Get the real reservation ID (for recurring instances, the ID might be virtual like "uuid_week3")
+  const getRealReservationId = () => {
+    const id = event.id;
+    // If it's a virtual recurring instance ID (contains _week), extract the parent ID
+    if (id.includes("_week")) {
+      return id.split("_week")[0];
+    }
+    return id;
+  };
+
+  const realReservationId = getRealReservationId();
+  const isVirtualInstance = event.id.includes("_week");
+
+  const handleCancelClick = () => {
+    if (event.resource.isRecurring) {
+      setShowRecurringDialog(true);
+    } else {
+      setShowConfirmDialog(true);
+    }
+  };
+
   const handleConfirmCancel = async () => {
     setShowConfirmDialog(false);
     setIsLoading(true);
     try {
-      const result = await cancelReservation(event.id);
+      const result = await cancelReservation(realReservationId);
       if (result.success) {
         toast.success(result.message || "Rezervasyon iptal edildi.");
+        onOpenChange(false);
+        onCancelled?.();
+      } else {
+        toast.error(result.message || "Bir hata oluştu.");
+      }
+    } catch {
+      toast.error("Bir hata oluştu.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelSingleInstance = async () => {
+    setShowRecurringDialog(false);
+    setIsLoading(true);
+    try {
+      const result = await cancelRecurringInstance(realReservationId, event.start.toISOString());
+      if (result.success) {
+        toast.success(result.message || "Bu tarih için rezervasyon iptal edildi.");
+        onOpenChange(false);
+        onCancelled?.();
+      } else {
+        toast.error(result.message || "Bir hata oluştu.");
+      }
+    } catch {
+      toast.error("Bir hata oluştu.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelAllInstances = async () => {
+    setShowRecurringDialog(false);
+    setIsLoading(true);
+    try {
+      const result = await cancelReservation(realReservationId);
+      if (result.success) {
+        toast.success(result.message || "Tüm haftalık rezervasyonlar iptal edildi.");
         onOpenChange(false);
         onCancelled?.();
       } else {
@@ -231,7 +292,7 @@ export function ReservationDetailDialog({
             <DialogFooter className="pt-4 border-t">
               <Button
                 variant="destructive"
-                onClick={() => setShowConfirmDialog(true)}
+                onClick={handleCancelClick}
                 disabled={isLoading}
                 className="gap-2"
               >
@@ -253,6 +314,49 @@ export function ReservationDetailDialog({
         variant="destructive"
         onConfirm={handleConfirmCancel}
       />
+
+      {/* Recurring Cancellation Dialog */}
+      <Dialog open={showRecurringDialog} onOpenChange={setShowRecurringDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Haftalık Rezervasyonu İptal Et</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Bu haftalık tekrarlayan rezervasyonu nasıl iptal etmek istiyorsunuz?
+            </p>
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={handleCancelSingleInstance}
+                disabled={isLoading}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Sadece bu tarihi iptal et ({format(event?.start || new Date(), "d MMMM yyyy", { locale: tr })})
+              </Button>
+              <Button
+                variant="destructive"
+                className="w-full justify-start"
+                onClick={handleCancelAllInstances}
+                disabled={isLoading}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Tüm haftalık rezervasyonları iptal et
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setShowRecurringDialog(false)}
+              disabled={isLoading}
+            >
+              Vazgeç
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
