@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, dateFnsLocalizer, Views, SlotInfo } from "react-big-calendar";
+import { Calendar, dateFnsLocalizer, Views, SlotInfo, View } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay, differenceInMinutes, areIntervalsOverlapping } from "date-fns";
 import { toast } from "sonner";
 import { tr } from "date-fns/locale";
@@ -139,6 +139,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedRoomFilter, setSelectedRoomFilter] = useState<string | null>(null);
+  const [view, setView] = useState<View>(Views.WEEK);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -313,6 +314,10 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
     setCurrentDate(date);
   }, []);
 
+  const handleViewChange = useCallback((newView: View) => {
+    setView(newView);
+  }, []);
+
   // Update reservations when parent refreshes
   const updateReservations = useCallback((newReservations: Reservation[]) => {
     setReservations(newReservations);
@@ -399,7 +404,8 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
               endAccessor="end"
               date={currentDate}
               onNavigate={handleNavigate}
-              defaultView={Views.WEEK}
+              view={view}
+              onView={handleViewChange}
               views={[Views.MONTH, Views.WEEK, Views.DAY]}
               selectable
               scrollToTime={new Date()}
