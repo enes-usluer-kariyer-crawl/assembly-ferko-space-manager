@@ -160,6 +160,11 @@
   @apply border-l border-border/30;
 }
 
+/* Hide All-Day row to remove gap between header and time grid */
+.rbc-allday-cell {
+  display: none !important;
+}
+
 .rbc-time-content {
   @apply border-t-0;
 }
