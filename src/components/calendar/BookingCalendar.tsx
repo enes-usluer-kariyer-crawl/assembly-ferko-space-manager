@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, dateFnsLocalizer, Views, SlotInfo, View } from "react-big-calendar";
-import { format, parse, startOfWeek, getDay, differenceInMinutes, areIntervalsOverlapping } from "date-fns";
+import { format, parse, startOfWeek, getDay, differenceInMinutes, areIntervalsOverlapping, startOfToday, isSameDay } from "date-fns";
 import { toast } from "sonner";
 import { tr } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
@@ -282,9 +282,18 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
       return;
     }
 
-    // Prevent booking in the past
-    if (slotInfo.start < new Date()) {
+    const now = new Date();
+    const today = startOfToday();
+
+    // Prevent booking in the past (before today)
+    if (slotInfo.start < today) {
       toast.error("Geçmiş bir zamana rezervasyon yapamazsınız.");
+      return;
+    }
+
+    // Prevent booking on the same day
+    if (isSameDay(slotInfo.start, now)) {
+      toast.error("Aynı gün içerisinde rezervasyon yapılamaz.");
       return;
     }
 
