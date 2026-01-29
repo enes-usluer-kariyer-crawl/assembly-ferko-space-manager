@@ -222,7 +222,10 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
       };
     }
 
-    return {};
+    // For future slots, add a specific class for hover effects
+    return {
+      className: 'rbc-future-time-slot'
+    };
   }, [bigEventRanges]);
 
   // Event style getter for color-coding by room

@@ -200,7 +200,7 @@
 }
 
 /* Hover effect for future slots */
-.rbc-time-slot:not(.rbc-past-time-slot):hover {
+.rbc-time-slot.rbc-future-time-slot:hover {
   background-color: hsl(var(--primary) / 0.2) !important;
   cursor: pointer;
   transition: background-color 200ms;
@@ -247,6 +247,7 @@
   @apply rounded-md px-2 py-1 text-sm font-medium border-0;
   padding: 1px 4px !important; /* Minimize padding */
   line-height: 1.1 !important;
+  pointer-events: auto; /* Ensure events are clickable even if container is not */
 }
 
 .rbc-event:focus {
@@ -312,6 +313,7 @@
 /* Day/Week view columns */
 .rbc-day-slot .rbc-events-container {
   @apply mr-2;
+  pointer-events: none; /* Let clicks pass through to the grid */
 }
 
 /* Dark mode adjustments */
