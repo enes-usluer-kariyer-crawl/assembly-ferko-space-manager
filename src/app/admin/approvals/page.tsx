@@ -6,6 +6,7 @@ import { tr } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Repeat } from "lucide-react";
+import { revalidatePath } from "next/cache";
 
 async function ApprovalActions({ reservationId }: { reservationId: string }) {
   async function approveAction() {
@@ -14,6 +15,8 @@ async function ApprovalActions({ reservationId }: { reservationId: string }) {
     if (!result.success) {
       console.error("Onaylama hatası:", result.error);
     }
+    revalidatePath("/admin/approvals");
+    redirect("/admin/approvals");
   }
 
   async function rejectAction() {
@@ -22,6 +25,8 @@ async function ApprovalActions({ reservationId }: { reservationId: string }) {
     if (!result.success) {
       console.error("Reddetme hatası:", result.error);
     }
+    revalidatePath("/admin/approvals");
+    redirect("/admin/approvals");
   }
 
   return (
