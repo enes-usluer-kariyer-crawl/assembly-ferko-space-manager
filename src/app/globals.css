@@ -106,6 +106,14 @@
   @apply border border-border/40 rounded-xl overflow-hidden bg-background;
 }
 
+/* Month view needs explicit height to display content */
+.rbc-month-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 600px;
+}
+
 /* Softer grid lines */
 .rbc-day-bg {
   @apply border-l border-border/30;
@@ -117,10 +125,22 @@
 
 .rbc-month-row {
   @apply border-b border-border/30;
+  min-height: 120px !important;
 }
 
 .rbc-month-row:last-child {
   @apply border-b-0;
+}
+
+/* Month view row content */
+.rbc-row-content {
+  @apply relative;
+  min-height: 100px;
+}
+
+/* Month view events container */
+.rbc-row-bg {
+  @apply flex-1;
 }
 
 .rbc-off-range-bg {
