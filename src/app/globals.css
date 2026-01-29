@@ -201,7 +201,9 @@
 
 /* Hover effect for future slots */
 .rbc-time-slot:not(.rbc-past-time-slot):hover {
-  @apply bg-primary/5 cursor-pointer transition-colors duration-200;
+  background-color: hsl(var(--primary) / 0.2) !important;
+  cursor: pointer;
+  transition: background-color 200ms;
 }
 
 .rbc-timeslot-group {
