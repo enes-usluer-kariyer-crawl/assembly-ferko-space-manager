@@ -177,6 +177,33 @@
   @apply border-t border-border/20;
 }
 
+/* Past time slots styling */
+.rbc-past-time-slot {
+  @apply bg-muted/30 cursor-not-allowed;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(0, 0, 0, 0.03) 10px,
+    rgba(0, 0, 0, 0.03) 20px
+  );
+}
+
+.dark .rbc-past-time-slot {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(255, 255, 255, 0.03) 10px,
+    rgba(255, 255, 255, 0.03) 20px
+  );
+}
+
+/* Hover effect for future slots */
+.rbc-time-slot:not(.rbc-past-time-slot):hover {
+  @apply bg-primary/5 cursor-pointer transition-colors duration-200;
+}
+
 .rbc-timeslot-group {
   @apply border-b border-border/30;
   min-height: 100px !important; /* Make each hour slot significantly taller */

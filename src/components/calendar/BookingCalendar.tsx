@@ -194,8 +194,10 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
       .map(e => ({ start: e.start, end: e.end }));
   }, [allEvents]);
 
-  // Slot style getter for hatched background on blocked time slots
+  // Slot style getter for hatched background on blocked time slots and past times
   const slotPropGetter = useCallback((date: Date) => {
+    const now = new Date();
+
     // Check if this slot falls within any big event range
     const isBlocked = bigEventRanges.some(range =>
       date >= range.start && date < range.end
@@ -205,6 +207,16 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
       return {
         style: {
           background: 'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 10px, #e5e7eb 10px, #e5e7eb 20px)',
+          pointerEvents: 'none' as const
+        }
+      };
+    }
+
+    // Check if the slot is in the past
+    if (date < now) {
+      return {
+        className: 'rbc-past-time-slot',
+        style: {
           pointerEvents: 'none' as const
         }
       };
@@ -264,6 +276,12 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
   const handleSelectSlot = useCallback((slotInfo: SlotInfo) => {
     if (!isAuthenticated) {
       router.push("/login?next=/");
+      return;
+    }
+
+    // Prevent booking in the past
+    if (slotInfo.start < new Date()) {
+      toast.error("Geçmiş bir zamana rezervasyon yapamazsınız.");
       return;
     }
 
