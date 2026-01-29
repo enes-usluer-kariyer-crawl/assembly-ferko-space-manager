@@ -125,9 +125,14 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
   // Expand recurring events to cover the view range
   const expandedReservations: Reservation[] = [];
 
-  // Determine the view range (default to 1 year ahead if not specified)
-  const viewStart = params?.startDate ? new Date(params.startDate) : new Date();
-  const viewEnd = params?.endDate ? new Date(params.endDate) : new Date(viewStart.getTime() + 365 * 24 * 60 * 60 * 1000);
+  // Determine the view range
+  // Default: 3 months back and 1 year ahead from today (for calendar views)
+  const now = new Date();
+  const defaultViewStart = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); // 3 months ago
+  const defaultViewEnd = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year ahead
+
+  const viewStart = params?.startDate ? new Date(params.startDate) : defaultViewStart;
+  const viewEnd = params?.endDate ? new Date(params.endDate) : defaultViewEnd;
 
   for (const reservation of baseReservations) {
     if (reservation.is_recurring && reservation.recurrence_pattern === "weekly") {
@@ -137,11 +142,11 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
       const duration = originalEnd.getTime() - originalStart.getTime();
 
       // Add the original event if it falls within the range
-      if (originalStart >= viewStart && originalStart <= viewEnd) {
+      if (originalStart <= viewEnd && originalEnd >= viewStart) {
         expandedReservations.push(reservation);
       }
 
-      // Generate future instances (up to 52 weeks = 1 year)
+      // Generate future instances (up to 52 weeks = 1 year from original date)
       let week = 1;
       while (week <= 52) {
         const instanceStart = new Date(originalStart);
@@ -152,8 +157,8 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
 
         const instanceEnd = new Date(instanceStart.getTime() + duration);
 
-        // Only include if within view range
-        if (instanceStart >= viewStart) {
+        // Include if instance overlaps with view range
+        if (instanceEnd >= viewStart) {
           expandedReservations.push({
             ...reservation,
             id: `${reservation.id}_week${week}`, // Virtual ID for recurring instance
@@ -166,13 +171,7 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
         week++;
       }
     } else {
-      // Non-recurring event - include if within date range (if specified)
-      const eventStart = new Date(reservation.start_time);
-      const eventEnd = new Date(reservation.end_time);
-
-      if (params?.startDate && eventEnd < viewStart) continue;
-      if (params?.endDate && eventStart > viewEnd) continue;
-
+      // Non-recurring event - include all (no date filtering for base query)
       expandedReservations.push(reservation);
     }
   }
