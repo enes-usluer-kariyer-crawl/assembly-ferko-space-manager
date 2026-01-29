@@ -139,6 +139,11 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedRoomFilter, setSelectedRoomFilter] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Convert reservations to calendar events
   const allEvents: CalendarEvent[] = useMemo(() => {
@@ -386,43 +391,49 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
 
         {/* Calendar */}
         <div className="flex-1 bg-background rounded-lg border" style={{ height: 'calc(100vh - 180px)' }}>
-          <Calendar
-            localizer={localizer}
-            events={visibleEvents}
-            startAccessor="start"
-            endAccessor="end"
-            date={currentDate}
-            onNavigate={handleNavigate}
-            defaultView={Views.WEEK}
-            views={[Views.MONTH, Views.WEEK, Views.DAY]}
-            selectable
-            scrollToTime={new Date()}
-            onSelectSlot={handleSelectSlot}
-            onSelectEvent={handleSelectEvent}
-            eventPropGetter={eventStyleGetter}
-            slotPropGetter={slotPropGetter}
-            min={new Date(0, 0, 0, 0, 0, 0)}
-            max={new Date(0, 0, 0, 23, 59, 59)}
-            step={30}
-            timeslots={2}
-            culture="tr"
-            messages={{
-              today: "Bugün",
-              previous: "Geri",
-              next: "İleri",
-              month: "Ay",
-              week: "Hafta",
-              day: "Gün",
-              agenda: "Ajanda",
-              noEventsInRange: "Bu aralıkta rezervasyon bulunmuyor.",
-              showMore: (count) => `+${count} daha`,
-            }}
-            components={{
-              toolbar: CalendarToolbar,
-              event: EventComponent,
-            }}
-            style={{ height: "100%" }}
-          />
+          {isMounted ? (
+            <Calendar
+              localizer={localizer}
+              events={visibleEvents}
+              startAccessor="start"
+              endAccessor="end"
+              date={currentDate}
+              onNavigate={handleNavigate}
+              defaultView={Views.WEEK}
+              views={[Views.MONTH, Views.WEEK, Views.DAY]}
+              selectable
+              scrollToTime={new Date()}
+              onSelectSlot={handleSelectSlot}
+              onSelectEvent={handleSelectEvent}
+              eventPropGetter={eventStyleGetter}
+              slotPropGetter={slotPropGetter}
+              min={new Date(0, 0, 0, 0, 0, 0)}
+              max={new Date(0, 0, 0, 23, 59, 59)}
+              step={30}
+              timeslots={2}
+              culture="tr"
+              messages={{
+                today: "Bugün",
+                previous: "Geri",
+                next: "İleri",
+                month: "Ay",
+                week: "Hafta",
+                day: "Gün",
+                agenda: "Ajanda",
+                noEventsInRange: "Bu aralıkta rezervasyon bulunmuyor.",
+                showMore: (count) => `+${count} daha`,
+              }}
+              components={{
+                toolbar: CalendarToolbar,
+                event: EventComponent,
+              }}
+              style={{ height: "100%" }}
+            />
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          )}
         </div>
 
         {/* New Reservation Dialog */}
