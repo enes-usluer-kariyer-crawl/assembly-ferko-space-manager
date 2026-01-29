@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Repeat } from "lucide-react";
 
 import { CancelReservationButton } from "@/components/reservations/CancelReservationButton";
+import { CancelRecurringButton } from "@/components/reservations/CancelRecurringButton";
 
 export default async function ReservationsPage() {
   const supabase = await createClient();
@@ -24,6 +25,8 @@ export default async function ReservationsPage() {
     );
   }
 
+  // Only fetch parent/standalone reservations (not recurring children)
+  // For recurring events, we only show the parent and offer cancel options
   const { data: reservations } = await supabase
     .from("reservations")
     .select(`
@@ -32,9 +35,15 @@ export default async function ReservationsPage() {
     `)
     .eq("user_id", user.id)
     .in("status", ["pending", "approved"])
-    .gte("end_time", new Date().toISOString())
+    .is("parent_reservation_id", null)
     .not("tags", "cs", '{"big_event_block"}')
     .order("start_time", { ascending: true });
+
+  // Filter: for non-recurring, only show future. For recurring, always show (they repeat)
+  const filteredReservations = (reservations ?? []).filter((r) => {
+    if (r.is_recurring) return true;
+    return new Date(r.end_time) >= new Date();
+  });
 
   return (
     <div className="p-6">
@@ -45,7 +54,7 @@ export default async function ReservationsPage() {
         </p>
       </div>
 
-      {!reservations || reservations.length === 0 ? (
+      {filteredReservations.length === 0 ? (
         <div className="rounded-lg border bg-card p-8 text-center">
           <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground" />
           <h2 className="mt-4 text-lg font-semibold">Rezervasyon Yok</h2>
@@ -55,10 +64,11 @@ export default async function ReservationsPage() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {reservations.map((reservation) => {
+          {filteredReservations.map((reservation) => {
             const isFuture = new Date(reservation.start_time) > new Date();
             const isCancellableStatus = ["pending", "approved"].includes(reservation.status);
-            const canCancel = isFuture && isCancellableStatus;
+            const canCancel = isCancellableStatus;
+            const isRecurring = reservation.is_recurring && reservation.recurrence_pattern === "weekly";
 
             return (
               <div
@@ -67,14 +77,30 @@ export default async function ReservationsPage() {
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="font-medium">{reservation.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium">{reservation.title}</h3>
+                      {isRecurring && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                          <Repeat className="h-3 w-3" />
+                          Haftalık
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {reservation.rooms?.name}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     {canCancel && (
-                      <CancelReservationButton reservationId={reservation.id} />
+                      isRecurring ? (
+                        <CancelRecurringButton
+                          reservationId={reservation.id}
+                          startTime={reservation.start_time}
+                          endTime={reservation.end_time}
+                        />
+                      ) : (
+                        isFuture && <CancelReservationButton reservationId={reservation.id} />
+                      )
                     )}
                     <span
                       className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -96,18 +122,35 @@ export default async function ReservationsPage() {
                   </div>
                 </div>
                 <div className="mt-2 text-sm text-muted-foreground">
-                  {new Date(reservation.start_time).toLocaleDateString("tr-TR", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}{" "}
-                  -{" "}
-                  {new Date(reservation.end_time).toLocaleTimeString("tr-TR", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
+                  {isRecurring ? (
+                    <>
+                      Her {new Date(reservation.start_time).toLocaleDateString("tr-TR", { weekday: "long" })},{" "}
+                      {new Date(reservation.start_time).toLocaleTimeString("tr-TR", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}{" "}
+                      -{" "}
+                      {new Date(reservation.end_time).toLocaleTimeString("tr-TR", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </>
+                  ) : (
+                    <>
+                      {new Date(reservation.start_time).toLocaleDateString("tr-TR", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}{" "}
+                      -{" "}
+                      {new Date(reservation.end_time).toLocaleTimeString("tr-TR", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </>
+                  )}
                 </div>
               </div>
             );
