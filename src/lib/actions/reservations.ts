@@ -64,6 +64,8 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
 }> {
   const supabase = await createClient();
 
+  // For recurring events, we need to fetch them separately and expand them
+  // First, fetch all non-recurring events and parent recurring events
   let query = supabase
     .from("reservations")
     .select(
@@ -91,15 +93,11 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
       )
     `
     )
-    .in("status", ["pending", "approved"]);
+    .in("status", ["pending", "approved"])
+    .is("parent_reservation_id", null); // Only fetch parent/standalone reservations
 
-  if (params?.startDate) {
-    query = query.gte("start_time", params.startDate);
-  }
-
-  if (params?.endDate) {
-    query = query.lte("end_time", params.endDate);
-  }
+  // Note: We don't filter by date here for recurring events
+  // because we need to expand them to cover the requested date range
 
   if (params?.roomId) {
     query = query.eq("room_id", params.roomId);
@@ -118,16 +116,75 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
   }
 
   // Transform the data to match our Reservation type
-  // Supabase returns rooms as an object (not array) for single foreign key relations
-  const reservations = (data ?? []).map((item) => ({
+  const baseReservations = (data ?? []).map((item) => ({
     ...item,
     rooms: item.rooms as unknown as { id: string; name: string },
     profiles: item.profiles as unknown as { full_name: string | null; email: string } | null,
   })) as Reservation[];
 
+  // Expand recurring events to cover the view range
+  const expandedReservations: Reservation[] = [];
+
+  // Determine the view range (default to 1 year ahead if not specified)
+  const viewStart = params?.startDate ? new Date(params.startDate) : new Date();
+  const viewEnd = params?.endDate ? new Date(params.endDate) : new Date(viewStart.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+  for (const reservation of baseReservations) {
+    if (reservation.is_recurring && reservation.recurrence_pattern === "weekly") {
+      // Generate recurring instances within the view range
+      const originalStart = new Date(reservation.start_time);
+      const originalEnd = new Date(reservation.end_time);
+      const duration = originalEnd.getTime() - originalStart.getTime();
+
+      // Add the original event if it falls within the range
+      if (originalStart >= viewStart && originalStart <= viewEnd) {
+        expandedReservations.push(reservation);
+      }
+
+      // Generate future instances (up to 52 weeks = 1 year)
+      let week = 1;
+      while (week <= 52) {
+        const instanceStart = new Date(originalStart);
+        instanceStart.setDate(instanceStart.getDate() + (week * 7));
+
+        // Stop if we're past the view range
+        if (instanceStart > viewEnd) break;
+
+        const instanceEnd = new Date(instanceStart.getTime() + duration);
+
+        // Only include if within view range
+        if (instanceStart >= viewStart) {
+          expandedReservations.push({
+            ...reservation,
+            id: `${reservation.id}_week${week}`, // Virtual ID for recurring instance
+            start_time: instanceStart.toISOString(),
+            end_time: instanceEnd.toISOString(),
+            parent_reservation_id: reservation.id, // Link back to parent
+          });
+        }
+
+        week++;
+      }
+    } else {
+      // Non-recurring event - include if within date range (if specified)
+      const eventStart = new Date(reservation.start_time);
+      const eventEnd = new Date(reservation.end_time);
+
+      if (params?.startDate && eventEnd < viewStart) continue;
+      if (params?.endDate && eventStart > viewEnd) continue;
+
+      expandedReservations.push(reservation);
+    }
+  }
+
+  // Sort by start time
+  expandedReservations.sort((a, b) =>
+    new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+  );
+
   return {
     success: true,
-    data: reservations,
+    data: expandedReservations,
   };
 }
 
@@ -380,6 +437,8 @@ export async function createReservation(
   const isRecurring = recurrencePattern === "weekly";
 
   // Insert main reservation
+  // For recurring events, we no longer create child instances upfront.
+  // Instead, the calendar will dynamically generate recurring instances.
   const { data: reservation, error: insertError } = await supabase
     .from("reservations")
     .insert({
@@ -407,47 +466,8 @@ export async function createReservation(
     };
   }
 
-  // Create recurring instances if weekly recurrence
-  if (isRecurring) {
-    const recurringInstances = [];
-    const startDate = new Date(startTime);
-    const endDate = new Date(endTime);
-
-    // Create 3 additional weeks (4 weeks total including the original)
-    for (let week = 1; week <= 3; week++) {
-      const recurringStart = new Date(startDate);
-      recurringStart.setDate(recurringStart.getDate() + (week * 7));
-
-      const recurringEnd = new Date(endDate);
-      recurringEnd.setDate(recurringEnd.getDate() + (week * 7));
-
-      recurringInstances.push({
-        room_id: roomId,
-        user_id: user.id,
-        title,
-        description: description ?? null,
-        start_time: recurringStart.toISOString(),
-        end_time: recurringEnd.toISOString(),
-        status,
-        tags: tags ?? [],
-        catering_requested: cateringRequested ?? false,
-        is_recurring: true,
-        recurrence_pattern: "weekly",
-        parent_reservation_id: reservation.id,
-      });
-    }
-
-    if (recurringInstances.length > 0) {
-      const { error: recurringError } = await supabase
-        .from("reservations")
-        .insert(recurringInstances);
-
-      if (recurringError) {
-        console.error("Error creating recurring instances:", recurringError);
-        // Don't fail the main reservation, just log the error
-      }
-    }
-  }
+  // Note: We no longer create child reservation instances for recurring events.
+  // Recurring events repeat indefinitely and are generated dynamically in the calendar view.
 
   // Get user's name for notification
   const { data: userProfile } = await supabase
@@ -469,7 +489,7 @@ export async function createReservation(
     console.log(`  - Room: ${roomId}`);
     console.log(`  - Time: ${startTime} - ${endTime}`);
     if (cateringRequested) console.log(`  - Catering: Requested`);
-    if (isRecurring) console.log(`  - Recurring: Weekly (4 weeks)`);
+    if (isRecurring) console.log(`  - Recurring: Weekly (repeats indefinitely)`);
   }
 
   // For Big Events: Create blocked placeholder reservations for ALL OTHER ROOMS
@@ -595,7 +615,7 @@ export async function updateReservationStatus(
   // Fetch the reservation to check if it's in the past
   const { data: reservation, error: reservationError } = await supabase
     .from("reservations")
-    .select("end_time")
+    .select("end_time, is_recurring")
     .eq("id", id)
     .single();
 
@@ -628,6 +648,19 @@ export async function updateReservationStatus(
     };
   }
 
+  // If this is a recurring parent reservation, update all child instances too
+  if (reservation.is_recurring) {
+    const { error: childUpdateError } = await supabase
+      .from("reservations")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("parent_reservation_id", id);
+
+    if (childUpdateError) {
+      console.error("Error updating child reservation statuses:", childUpdateError);
+      // Don't fail the main operation, but log the error
+    }
+  }
+
   // Revalidate paths to refresh data
   revalidatePath("/");
   revalidatePath("/admin/approvals");
@@ -646,6 +679,8 @@ export type PendingReservation = {
   end_time: string;
   catering_requested: boolean;
   created_at: string;
+  is_recurring: boolean;
+  recurrence_pattern: "none" | "weekly";
   rooms: {
     name: string;
   };
@@ -662,6 +697,8 @@ export async function getPendingReservations(): Promise<{
 }> {
   const supabase = await createClient();
 
+  // Only fetch parent reservations (not children with parent_reservation_id)
+  // This way recurring events appear as a single entry
   const { data, error } = await supabase
     .from("reservations")
     .select(
@@ -672,6 +709,8 @@ export async function getPendingReservations(): Promise<{
       end_time,
       catering_requested,
       created_at,
+      is_recurring,
+      recurrence_pattern,
       rooms (
         name
       ),
@@ -682,6 +721,7 @@ export async function getPendingReservations(): Promise<{
     `
     )
     .eq("status", "pending")
+    .is("parent_reservation_id", null) // Only parent reservations (not recurring children)
     .order("created_at", { ascending: true });
 
   if (error) {

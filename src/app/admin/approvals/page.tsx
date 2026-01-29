@@ -5,16 +5,23 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { Repeat } from "lucide-react";
 
 async function ApprovalActions({ reservationId }: { reservationId: string }) {
   async function approveAction() {
     "use server";
-    await updateReservationStatus(reservationId, "approved");
+    const result = await updateReservationStatus(reservationId, "approved");
+    if (!result.success) {
+      console.error("Onaylama hatası:", result.error);
+    }
   }
 
   async function rejectAction() {
     "use server";
-    await updateReservationStatus(reservationId, "rejected");
+    const result = await updateReservationStatus(reservationId, "rejected");
+    if (!result.success) {
+      console.error("Reddetme hatası:", result.error);
+    }
   }
 
   return (
@@ -86,6 +93,7 @@ export default async function AdminApprovalsPage() {
                   <th className="text-left p-4 font-medium">Oda</th>
                   <th className="text-left p-4 font-medium">Tarih / Saat</th>
                   <th className="text-left p-4 font-medium">Başlık</th>
+                  <th className="text-left p-4 font-medium">Tekrar</th>
                   <th className="text-left p-4 font-medium">Catering</th>
                   <th className="text-left p-4 font-medium">İşlemler</th>
                 </tr>
@@ -101,6 +109,9 @@ export default async function AdminApprovalsPage() {
                     <td className="p-4">{reservation.rooms.name}</td>
                     <td className="p-4">
                       <div>
+                        {reservation.is_recurring && (
+                          <span className="text-xs text-muted-foreground">İlk: </span>
+                        )}
                         {format(new Date(reservation.start_time), "d MMMM yyyy", {
                           locale: tr,
                         })}
@@ -111,6 +122,16 @@ export default async function AdminApprovalsPage() {
                       </div>
                     </td>
                     <td className="p-4">{reservation.title}</td>
+                    <td className="p-4">
+                      {reservation.is_recurring ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <Repeat className="w-3 h-3" />
+                          Her Hafta
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
                     <td className="p-4">
                       {reservation.catering_requested ? (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">

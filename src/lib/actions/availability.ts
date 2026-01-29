@@ -144,7 +144,7 @@ export async function checkAvailability({
     };
   }
 
-  // Logic 1: Check if the specific room is booked
+  // Logic 1: Check if the specific room is booked (non-recurring events)
   const { data: roomConflict, error: roomError } = await supabase.rpc(
     "check_reservation_conflict",
     {
@@ -182,6 +182,56 @@ export async function checkAvailability({
       conflictingRoomId: roomId,
       conflictingReservationId: conflictingReservation?.id,
     };
+  }
+
+  // Logic 4: Check recurring events for conflicts
+  // Fetch all approved weekly recurring events for this room
+  const { data: recurringEvents, error: recurringError } = await supabase
+    .from("reservations")
+    .select("id, title, start_time, end_time")
+    .eq("room_id", roomId)
+    .eq("is_recurring", true)
+    .eq("recurrence_pattern", "weekly")
+    .in("status", ["pending", "approved"])
+    .is("parent_reservation_id", null) // Only parent recurring events
+    .neq("id", excludeReservationId ?? "00000000-0000-0000-0000-000000000000");
+
+  if (recurringError) {
+    console.error("Error checking recurring events:", recurringError);
+  } else if (recurringEvents && recurringEvents.length > 0) {
+    const requestedStart = new Date(startTime);
+    const requestedEnd = new Date(endTime);
+
+    for (const event of recurringEvents) {
+      const eventStart = new Date(event.start_time);
+      const eventEnd = new Date(event.end_time);
+      const eventDuration = eventEnd.getTime() - eventStart.getTime();
+
+      // Check if any recurring instance conflicts
+      // Generate instances from the original date up to 52 weeks in the future
+      for (let week = 0; week <= 52; week++) {
+        const instanceStart = new Date(eventStart);
+        instanceStart.setDate(instanceStart.getDate() + (week * 7));
+
+        // Skip if this instance is before the requested time
+        if (instanceStart.getTime() + eventDuration <= requestedStart.getTime()) continue;
+
+        // Stop if this instance is way after the requested time (no point checking further)
+        if (instanceStart.getTime() > requestedEnd.getTime() + 7 * 24 * 60 * 60 * 1000) break;
+
+        const instanceEnd = new Date(instanceStart.getTime() + eventDuration);
+
+        // Check for overlap
+        if (requestedStart < instanceEnd && requestedEnd > instanceStart) {
+          return {
+            available: false,
+            reason: `Bu saat aralığında tekrar eden bir etkinlik var: "${event.title}".`,
+            conflictingRoomId: roomId,
+            conflictingReservationId: event.id,
+          };
+        }
+      }
+    }
   }
 
   return { available: true };
