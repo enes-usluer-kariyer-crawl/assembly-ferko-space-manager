@@ -47,13 +47,16 @@ function generateICS(event: {
   const start = formatDate(event.startTime);
   const end = formatDate(event.endTime);
 
+  // Simple escape - only escape newlines and backslashes
   const escapeText = (text: string) =>
-    text.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+    text.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
 
-  return [
+  // RFC 5545 compliant ICS
+  const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Ferko Space Manager//TR",
+    "PRODID:-//Ferko Space Manager//EN",
+    "CALSCALE:GREGORIAN",
     "METHOD:REQUEST",
     "BEGIN:VEVENT",
     `UID:${event.uid}`,
@@ -64,12 +67,20 @@ function generateICS(event: {
     `DESCRIPTION:${escapeText(event.description || "")}`,
     `LOCATION:${escapeText(event.location)}`,
     `ORGANIZER;CN=${escapeText(event.organizerName)}:mailto:${event.organizerEmail}`,
-    `ATTENDEE;RSVP=TRUE;PARTSTAT=NEEDS-ACTION;CN=${event.attendeeEmail}:mailto:${event.attendeeEmail}`,
+    `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN=${event.attendeeEmail}:mailto:${event.attendeeEmail}`,
     "STATUS:CONFIRMED",
     "SEQUENCE:0",
+    "TRANSP:OPAQUE",
+    "BEGIN:VALARM",
+    "ACTION:DISPLAY",
+    "DESCRIPTION:Reminder",
+    "TRIGGER:-PT15M",
+    "END:VALARM",
     "END:VEVENT",
     "END:VCALENDAR",
-  ].join("\r\n");
+  ];
+
+  return lines.join("\r\n");
 }
 
 function formatDateTurkish(dateStr: string): string {
@@ -81,14 +92,14 @@ function formatDateTurkish(dateStr: string): string {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Istanbul",
   });
 }
 
 function generateEmailHTML(params: InvitationRequest): string {
   const { reservation, organizer } = params;
 
-  return `
-<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
@@ -96,13 +107,13 @@ function generateEmailHTML(params: InvitationRequest): string {
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Toplantı Daveti</h1>
+    <h1 style="color: white; margin: 0; font-size: 24px;">Toplanti Daveti</h1>
   </div>
 
   <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
     <p style="margin-top: 0;">Merhaba,</p>
 
-    <p><strong>${organizer.name}</strong> sizi bir toplantıya davet etti.</p>
+    <p><strong>${organizer.name}</strong> sizi bir toplantiya davet etti.</p>
 
     <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb; margin: 20px 0;">
       <h2 style="margin-top: 0; color: #4f46e5; font-size: 18px;">${reservation.title}</h2>
@@ -113,16 +124,16 @@ function generateEmailHTML(params: InvitationRequest): string {
           <td style="padding: 8px 0; font-weight: 500;">${reservation.roomName}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #6b7280;">Başlangıç:</td>
+          <td style="padding: 8px 0; color: #6b7280;">Baslangic:</td>
           <td style="padding: 8px 0; font-weight: 500;">${formatDateTurkish(reservation.startTime)}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #6b7280;">Bitiş:</td>
+          <td style="padding: 8px 0; color: #6b7280;">Bitis:</td>
           <td style="padding: 8px 0; font-weight: 500;">${formatDateTurkish(reservation.endTime)}</td>
         </tr>
         ${reservation.description ? `
         <tr>
-          <td style="padding: 8px 0; color: #6b7280; vertical-align: top;">Açıklama:</td>
+          <td style="padding: 8px 0; color: #6b7280; vertical-align: top;">Aciklama:</td>
           <td style="padding: 8px 0;">${reservation.description}</td>
         </tr>
         ` : ""}
@@ -130,18 +141,17 @@ function generateEmailHTML(params: InvitationRequest): string {
     </div>
 
     <p style="background: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
-      <strong>Not:</strong> Takvim uygulamanızda etkinliği eklemek için ekteki <code>.ics</code> dosyasını açın veya email istemcinizde "Kabul Et" seçeneğini kullanın.
+      <strong>Not:</strong> Takvim uygulamanizda etkinligi eklemek icin ekteki davet.ics dosyasini acin.
     </p>
 
     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
 
     <p style="color: #6b7280; font-size: 14px; margin-bottom: 0;">
-      Bu email Ferko Space Manager tarafından otomatik olarak gönderilmiştir.
+      Bu email Ferko Space Manager tarafindan otomatik olarak gonderilmistir.
     </p>
   </div>
 </body>
-</html>
-  `.trim();
+</html>`;
 }
 
 serve(async (req) => {
@@ -173,7 +183,7 @@ serve(async (req) => {
 
     // Generate ICS content
     const icsContent = generateICS({
-      uid: `${reservation.id}@ferko-space-manager`,
+      uid: `${reservation.id}@ferko-space-manager.com`,
       title: reservation.title,
       description: reservation.description,
       startTime: reservation.startTime,
@@ -187,7 +197,7 @@ serve(async (req) => {
     // Generate email HTML
     const emailHTML = generateEmailHTML(params);
 
-    // Create SMTP client using denomailer (Deno 2.x compatible)
+    // Create SMTP client
     const client = new SMTPClient({
       connection: {
         hostname: SMTP_HOSTNAME,
@@ -200,18 +210,18 @@ serve(async (req) => {
       },
     });
 
-    // Send email with ICS attachment
+    // Send email with proper calendar attachment
     await client.send({
       from: SMTP_USERNAME,
       to: to,
-      subject: `Toplantı Daveti: ${reservation.title}`,
-      content: "Takvim davetiniz ekte bulunmaktadır.",
+      subject: `Toplanti Daveti: ${reservation.title}`,
+      content: "Takvim davetiniz HTML destekli bir email istemcisi gerektirmektedir.",
       html: emailHTML,
       attachments: [
         {
           filename: "davet.ics",
           content: new TextEncoder().encode(icsContent),
-          contentType: "text/calendar; method=REQUEST",
+          contentType: "text/calendar; charset=utf-8; method=REQUEST",
         },
       ],
     });
