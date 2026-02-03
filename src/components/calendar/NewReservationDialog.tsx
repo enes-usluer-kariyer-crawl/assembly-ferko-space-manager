@@ -29,7 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { Room, ConflictingReservation } from "@/lib/actions/reservations";
 import { createReservation } from "@/lib/actions/reservations";
 import { ROOM_CAPACITIES } from "@/constants/rooms";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Plus, X, Mail } from "lucide-react";
 
 type NewReservationDialogProps = {
   open: boolean;
@@ -100,6 +100,9 @@ export function NewReservationDialog({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [cateringRequested, setCateringRequested] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState<"none" | "weekly">("none");
+  const [attendees, setAttendees] = useState<string[]>([]);
+  const [attendeeInput, setAttendeeInput] = useState("");
+  const [attendeeError, setAttendeeError] = useState<string | null>(null);
 
   // Get tomorrow's date in YYYY-MM-DD format for min date validation
   const calculateMinDate = () => {
@@ -120,6 +123,9 @@ export function NewReservationDialog({
       setSelectedTags([]);
       setCateringRequested(false);
       setRecurrencePattern("none");
+      setAttendees([]);
+      setAttendeeInput("");
+      setAttendeeError(null);
 
       if (initialStartTime) {
         setStartDate(format(initialStartTime, "yyyy-MM-dd"));
@@ -145,6 +151,34 @@ export function NewReservationDialog({
         ? prev.filter((t) => t !== tag)
         : [...prev, tag]
     );
+  };
+
+  const isValidEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const addAttendee = () => {
+    const email = attendeeInput.trim().toLowerCase();
+    setAttendeeError(null);
+
+    if (!email) return;
+
+    if (!isValidEmail(email)) {
+      setAttendeeError("Geçerli bir email adresi girin");
+      return;
+    }
+
+    if (attendees.includes(email)) {
+      setAttendeeError("Bu email zaten eklenmiş");
+      return;
+    }
+
+    setAttendees([...attendees, email]);
+    setAttendeeInput("");
+  };
+
+  const removeAttendee = (email: string) => {
+    setAttendees(attendees.filter((e) => e !== email));
   };
 
   const handleFormAction = async (formData: FormData) => {
@@ -205,6 +239,7 @@ export function NewReservationDialog({
         tags: selectedTags,
         cateringRequested,
         recurrencePattern,
+        attendees: attendees.length > 0 ? attendees : undefined,
       });
 
       if (!result.success) {
@@ -421,6 +456,63 @@ export function NewReservationDialog({
                   Bu rezervasyon 4 hafta boyunca her hafta aynı gün ve saatte tekrarlanacak.
                 </p>
               )}
+            </div>
+
+            {/* Katılımcılar */}
+            <div className="space-y-2">
+              <Label>Katılımcılar</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="ornek@email.com"
+                  value={attendeeInput}
+                  onChange={(e) => {
+                    setAttendeeInput(e.target.value);
+                    setAttendeeError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addAttendee();
+                    }
+                  }}
+                  className={attendeeError ? "border-destructive" : ""}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={addAttendee}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {attendeeError && (
+                <p className="text-xs text-destructive">{attendeeError}</p>
+              )}
+              {attendees.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {attendees.map((email) => (
+                    <div
+                      key={email}
+                      className="flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 rounded-md text-sm"
+                    >
+                      <Mail className="h-3 w-3" />
+                      <span className="max-w-[180px] truncate">{email}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttendee(email)}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Katılımcılara takvim daveti içeren email gönderilecek
+              </p>
             </div>
 
             {/* Description */}

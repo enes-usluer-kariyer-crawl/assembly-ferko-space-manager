@@ -236,6 +236,7 @@ export type CreateReservationInput = {
   tags?: string[];
   cateringRequested?: boolean;
   recurrencePattern?: "none" | "weekly";
+  attendees?: string[];
 };
 
 export type ConflictingReservation = {
@@ -264,7 +265,7 @@ export type CreateReservationResult = {
 export async function createReservation(
   input: CreateReservationInput
 ): Promise<CreateReservationResult> {
-  const { roomId, title, description, startTime, endTime, tags, cateringRequested, recurrencePattern } =
+  const { roomId, title, description, startTime, endTime, tags, cateringRequested, recurrencePattern, attendees } =
     input;
 
   // Validate required fields
@@ -489,6 +490,34 @@ export async function createReservation(
     console.log(`  - Time: ${startTime} - ${endTime}`);
     if (cateringRequested) console.log(`  - Catering: Requested`);
     if (isRecurring) console.log(`  - Recurring: Weekly (repeats indefinitely)`);
+  }
+
+  // Send invitation emails to attendees
+  if (attendees && attendees.length > 0) {
+    const { sendInvitationEmails } = await import("@/lib/email/send-invitation");
+
+    const { sent, failed } = await sendInvitationEmails(
+      attendees,
+      {
+        id: reservation.id,
+        title,
+        description,
+        startTime,
+        endTime,
+        roomName: room.name,
+      },
+      {
+        name: userName,
+        email: userProfile?.email || "",
+      }
+    );
+
+    if (sent.length > 0) {
+      console.log(`[INVITATION] Successfully sent ${sent.length} invitation(s)`);
+    }
+    if (failed.length > 0) {
+      console.warn(`[INVITATION] Failed to send ${failed.length} invitation(s)`);
+    }
   }
 
   // For Big Events: Create blocked placeholder reservations for ALL OTHER ROOMS
