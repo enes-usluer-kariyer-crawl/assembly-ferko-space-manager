@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const SMTP_HOSTNAME = Deno.env.get("SMTP_HOSTNAME") || "smtp.gmail.com";
 const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "465");
@@ -47,7 +47,6 @@ function generateICS(event: {
   const start = formatDate(event.startTime);
   const end = formatDate(event.endTime);
 
-  // Escape special characters in text fields
   const escapeText = (text: string) =>
     text.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 
@@ -163,6 +162,15 @@ serve(async (req) => {
       );
     }
 
+    // Check SMTP configuration
+    if (!SMTP_USERNAME || !SMTP_PASSWORD) {
+      console.error("SMTP credentials not configured");
+      return new Response(
+        JSON.stringify({ success: false, error: "Email service not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Generate ICS content
     const icsContent = generateICS({
       uid: `${reservation.id}@ferko-space-manager`,
@@ -179,47 +187,33 @@ serve(async (req) => {
     // Generate email HTML
     const emailHTML = generateEmailHTML(params);
 
-    // Create SMTP client and send email
-    const client = new SmtpClient();
-
-    await client.connectTLS({
-      hostname: SMTP_HOSTNAME,
-      port: SMTP_PORT,
-      username: SMTP_USERNAME,
-      password: SMTP_PASSWORD,
+    // Create SMTP client using denomailer (Deno 2.x compatible)
+    const client = new SMTPClient({
+      connection: {
+        hostname: SMTP_HOSTNAME,
+        port: SMTP_PORT,
+        tls: true,
+        auth: {
+          username: SMTP_USERNAME,
+          password: SMTP_PASSWORD,
+        },
+      },
     });
 
-    // Create multipart email with ICS attachment
-    const boundary = `----=_Part_${Date.now()}`;
-    const icsBase64 = btoa(unescape(encodeURIComponent(icsContent)));
-
-    const emailBody = [
-      `Content-Type: multipart/mixed; boundary="${boundary}"`,
-      "",
-      `--${boundary}`,
-      "Content-Type: text/html; charset=UTF-8",
-      "Content-Transfer-Encoding: 7bit",
-      "",
-      emailHTML,
-      "",
-      `--${boundary}`,
-      'Content-Type: text/calendar; charset="UTF-8"; method=REQUEST',
-      "Content-Transfer-Encoding: base64",
-      'Content-Disposition: attachment; filename="davet.ics"',
-      "",
-      icsBase64,
-      "",
-      `--${boundary}--`,
-    ].join("\r\n");
-
+    // Send email with ICS attachment
     await client.send({
       from: SMTP_USERNAME,
       to: to,
       subject: `Toplantı Daveti: ${reservation.title}`,
-      content: emailBody,
-      headers: {
-        "Content-Type": `multipart/mixed; boundary="${boundary}"`,
-      },
+      content: "Takvim davetiniz ekte bulunmaktadır.",
+      html: emailHTML,
+      attachments: [
+        {
+          filename: "davet.ics",
+          content: new TextEncoder().encode(icsContent),
+          contentType: "text/calendar; method=REQUEST",
+        },
+      ],
     });
 
     await client.close();
