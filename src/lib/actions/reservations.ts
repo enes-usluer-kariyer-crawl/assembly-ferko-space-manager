@@ -880,7 +880,8 @@ export async function cancelReservation(
   }
 
   const attendees = Array.isArray(reservation.attendees) ? reservation.attendees : [];
-  const organizerProfile = reservation.profiles as
+  const rawProfiles = reservation.profiles as unknown;
+  const organizerProfile = (Array.isArray(rawProfiles) ? rawProfiles[0] : rawProfiles) as
     | { full_name: string | null; email: string }
     | null
     | undefined;
