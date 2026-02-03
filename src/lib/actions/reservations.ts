@@ -887,7 +887,12 @@ export async function cancelReservation(
     | undefined;
   const organizerName = organizerProfile?.full_name || organizerProfile?.email || "Unknown User";
   const organizerEmail = organizerProfile?.email || "";
-  const roomName = (reservation.rooms as { name: string } | null | undefined)?.name || "Bilinmeyen Oda";
+  const rawRooms = reservation.rooms as unknown;
+  const roomRecord = (Array.isArray(rawRooms) ? rawRooms[0] : rawRooms) as
+    | { name: string }
+    | null
+    | undefined;
+  const roomName = roomRecord?.name || "Bilinmeyen Oda";
 
   if (attendees.length > 0 && organizerEmail) {
     const { sendCancellationEmails } = await import("@/lib/email/send-cancellation");
