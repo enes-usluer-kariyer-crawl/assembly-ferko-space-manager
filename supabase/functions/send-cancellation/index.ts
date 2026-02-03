@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import {
+  SMTPClient,
+  quotedPrintableEncode,
+} from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const SMTP_HOSTNAME = Deno.env.get("SMTP_HOSTNAME") || "smtp.gmail.com";
 const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "465");
@@ -196,19 +199,32 @@ serve(async (req) => {
       },
     });
 
+    const plainText = `Merhaba,\n\n${organizer.name} tarafindan planlanan toplanti iptal edilmistir.\n\nBaslik: ${reservation.title}\nOda: ${reservation.roomName}\nBaslangic: ${formatDateTurkish(reservation.startTime)}\nBitis: ${formatDateTurkish(reservation.endTime)}\n\nBu email Ferko Space Manager tarafindan otomatik olarak gonderilmistir.`;
+
     await client.send({
       from: SMTP_USERNAME,
       to: to,
       subject: `Toplanti Iptali: ${reservation.title}`,
-      content: "Takvim iptaliniz HTML destekli bir email istemcisi gerektirmektedir.",
-      html: emailHTML,
-      attachments: [
+      mimeContent: [
         {
-          filename: "iptal.ics",
-          content: new TextEncoder().encode(icsContent),
-          contentType: "text/calendar; charset=utf-8; method=CANCEL",
+          mimeType: 'text/plain; charset="utf-8"',
+          content: quotedPrintableEncode(plainText),
+          transferEncoding: "quoted-printable",
+        },
+        {
+          mimeType: 'text/html; charset="utf-8"',
+          content: quotedPrintableEncode(emailHTML),
+          transferEncoding: "quoted-printable",
+        },
+        {
+          mimeType: 'text/calendar; charset="utf-8"; method=CANCEL',
+          content: quotedPrintableEncode(icsContent),
+          transferEncoding: "quoted-printable",
         },
       ],
+      headers: {
+        "Content-Class": "urn:content-classes:calendarmessage",
+      },
     });
 
     await client.close();
