@@ -8,6 +8,7 @@ type TeamsReservationAlertParams = {
   endTime: string;
   requesterName: string;
   requesterEmail?: string | null;
+  attendees?: string[];
   tags?: string[];
   cateringRequested?: boolean;
   isRecurring?: boolean;
@@ -63,6 +64,8 @@ export async function sendTeamsReservationAlert(
     : params.requesterName;
 
   const tagsText = params.tags && params.tags.length > 0 ? params.tags.join(", ") : "-";
+  const attendeesText =
+    params.attendees && params.attendees.length > 0 ? params.attendees.join(", ") : "-";
 
   const statusLabelMap: Record<TeamsReservationAlertParams["status"], string> = {
     pending: "Onay bekliyor",
@@ -94,6 +97,7 @@ export async function sendTeamsReservationAlert(
           { name: "Tekrarlı", value: params.isRecurring ? "Haftalık" : "Hayır" },
           { name: "İkram", value: params.cateringRequested ? "Evet" : "Hayır" },
           { name: "Etiketler", value: tagsText },
+          { name: "Katılımcılar", value: attendeesText },
           { name: "Rezervasyon ID", value: params.reservationId },
         ],
         markdown: true,

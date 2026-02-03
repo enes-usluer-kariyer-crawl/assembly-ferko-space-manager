@@ -491,6 +491,7 @@ export async function createReservation(
       endTime,
       requesterName: userName,
       requesterEmail: userProfile?.email,
+      attendees: attendees ?? [],
       tags: tags ?? [],
       cateringRequested: cateringRequested ?? false,
       isRecurring,
@@ -674,6 +675,7 @@ export async function updateReservationStatus(
       tags,
       attendees,
       catering_requested,
+      attendees,
       is_recurring,
       rooms (
         name
@@ -731,6 +733,7 @@ export async function updateReservationStatus(
       endTime: reservation.end_time,
       requesterName,
       requesterEmail: requesterProfile?.email,
+      attendees: reservation.attendees ?? [],
       tags: reservation.tags ?? [],
       cateringRequested: reservation.catering_requested ?? false,
       isRecurring: reservation.is_recurring,
