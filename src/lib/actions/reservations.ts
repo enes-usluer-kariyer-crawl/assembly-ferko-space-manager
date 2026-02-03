@@ -37,6 +37,7 @@ export type Reservation = {
   end_time: string;
   status: "pending" | "approved" | "rejected" | "cancelled";
   tags: string[];
+  attendees?: string[];
   catering_requested: boolean;
   is_recurring: boolean;
   recurrence_pattern: "none" | "weekly";
@@ -79,6 +80,7 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
       end_time,
       status,
       tags,
+      attendees,
       catering_requested,
       is_recurring,
       recurrence_pattern,
@@ -450,6 +452,7 @@ export async function createReservation(
       end_time: endTime,
       status,
       tags: tags ?? [],
+      attendees: attendees ?? [],
       catering_requested: cateringRequested ?? false,
       is_recurring: isRecurring,
       recurrence_pattern: recurrencePattern ?? "none",
@@ -810,7 +813,7 @@ export async function cancelReservation(
   // Fetch the reservation to get the owner and end_time
   const { data: reservation, error: reservationError } = await supabase
     .from("reservations")
-    .select("id, user_id, status, start_time, end_time, room_id, tags, rooms(name)")
+    .select("id, user_id, title, description, status, start_time, end_time, room_id, tags, attendees, rooms(name), profiles(full_name, email)")
     .eq("id", reservationId)
     .single();
 
@@ -874,6 +877,42 @@ export async function cancelReservation(
       success: false,
       message: "Rezervasyon iptal edilirken bir hata oluştu.",
     };
+  }
+
+  const attendees = Array.isArray(reservation.attendees) ? reservation.attendees : [];
+  const organizerProfile = reservation.profiles as
+    | { full_name: string | null; email: string }
+    | null
+    | undefined;
+  const organizerName = organizerProfile?.full_name || organizerProfile?.email || "Unknown User";
+  const organizerEmail = organizerProfile?.email || "";
+  const roomName = (reservation.rooms as { name: string } | null | undefined)?.name || "Bilinmeyen Oda";
+
+  if (attendees.length > 0 && organizerEmail) {
+    const { sendCancellationEmails } = await import("@/lib/email/send-cancellation");
+
+    const { sent, failed } = await sendCancellationEmails(
+      attendees,
+      {
+        id: reservation.id,
+        title: reservation.title,
+        description: reservation.description ?? undefined,
+        startTime: reservation.start_time,
+        endTime: reservation.end_time,
+        roomName,
+      },
+      {
+        name: organizerName,
+        email: organizerEmail,
+      }
+    );
+
+    if (sent.length > 0) {
+      console.log(`[CANCELLATION] Successfully sent ${sent.length} cancellation(s)`);
+    }
+    if (failed.length > 0) {
+      console.warn(`[CANCELLATION] Failed to send ${failed.length} cancellation(s)`);
+    }
   }
 
   // --- BIG EVENT CASCADE CANCELLATION LOG ---

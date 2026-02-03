@@ -1,0 +1,2 @@
+ALTER TABLE reservations
+ADD COLUMN IF NOT EXISTS attendees TEXT[] DEFAULT '{}';
