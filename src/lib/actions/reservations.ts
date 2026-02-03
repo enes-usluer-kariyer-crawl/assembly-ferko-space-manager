@@ -512,8 +512,8 @@ export async function createReservation(
     if (isRecurring) console.log(`  - Recurring: Weekly (repeats indefinitely)`);
   }
 
-  // Send invitation emails to attendees
-  if (attendees && attendees.length > 0) {
+  // Send invitation emails to attendees only when the reservation is approved
+  if (status === "approved" && attendees && attendees.length > 0) {
     const { sendInvitationEmails } = await import("@/lib/email/send-invitation");
 
     const { sent, failed } = await sendInvitationEmails(
@@ -521,7 +521,7 @@ export async function createReservation(
       {
         id: reservation.id,
         title,
-        description,
+        description: description ?? undefined,
         startTime,
         endTime,
         roomName: room.name,
@@ -667,10 +667,12 @@ export async function updateReservationStatus(
       `
       id,
       title,
+      description,
       start_time,
       end_time,
       status,
       tags,
+      attendees,
       catering_requested,
       is_recurring,
       rooms (
@@ -734,6 +736,33 @@ export async function updateReservationStatus(
       isRecurring: reservation.is_recurring,
       status: "approved",
     });
+
+    const attendees = Array.isArray(reservation.attendees) ? reservation.attendees : [];
+    if (attendees.length > 0) {
+      const { sendInvitationEmails } = await import("@/lib/email/send-invitation");
+      const { sent, failed } = await sendInvitationEmails(
+        attendees,
+        {
+          id: reservation.id,
+          title: reservation.title,
+          description: reservation.description ?? undefined,
+          startTime: reservation.start_time,
+          endTime: reservation.end_time,
+          roomName,
+        },
+        {
+          name: requesterName,
+          email: requesterProfile?.email || "",
+        }
+      );
+
+      if (sent.length > 0) {
+        console.log(`[INVITATION] Successfully sent ${sent.length} invitation(s)`);
+      }
+      if (failed.length > 0) {
+        console.warn(`[INVITATION] Failed to send ${failed.length} invitation(s)`);
+      }
+    }
   }
 
   // If this is a recurring parent reservation, update all child instances too
