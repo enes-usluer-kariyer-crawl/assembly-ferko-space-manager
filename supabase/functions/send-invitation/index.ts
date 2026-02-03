@@ -3,8 +3,8 @@ import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const SMTP_HOSTNAME = Deno.env.get("SMTP_HOSTNAME") || "smtp.gmail.com";
 const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "465");
-const SMTP_USERNAME = Deno.env.get("SMTP_USERNAME") || "";
-const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD") || "";
+const SMTP_USERNAME = Deno.env.get("SMTP_USERNAME") || "assembly.bildirim@gmail.com";
+const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD") || "ocho auac jnzv vakf";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
