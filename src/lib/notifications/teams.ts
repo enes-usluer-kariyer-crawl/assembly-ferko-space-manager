@@ -11,6 +11,7 @@ type TeamsReservationAlertParams = {
   tags?: string[];
   cateringRequested?: boolean;
   isRecurring?: boolean;
+  status: "pending" | "approved" | "rejected";
 };
 
 type TeamsReservationAlertResult = {
@@ -63,25 +64,37 @@ export async function sendTeamsReservationAlert(
 
   const tagsText = params.tags && params.tags.length > 0 ? params.tags.join(", ") : "-";
 
+  const statusLabelMap: Record<TeamsReservationAlertParams["status"], string> = {
+    pending: "Onay bekliyor",
+    approved: "Onaylandı",
+    rejected: "Reddedildi",
+  };
+
+  const activityTitleMap: Record<TeamsReservationAlertParams["status"], string> = {
+    pending: "Yeni rezervasyon isteği",
+    approved: "Rezervasyon onaylandı",
+    rejected: "Rezervasyon reddedildi",
+  };
+
   const payload = {
     "@type": "MessageCard",
     "@context": "http://schema.org/extensions",
-    summary: "New reservation request",
-    themeColor: "F2C94C",
+    summary: activityTitleMap[params.status],
+    themeColor: params.status === "approved" ? "27AE60" : params.status === "rejected" ? "EB5757" : "F2C94C",
     sections: [
       {
-        activityTitle: "New reservation request",
+        activityTitle: activityTitleMap[params.status],
         activitySubtitle: requesterLabel,
         facts: [
-          { name: "Title", value: params.title },
-          { name: "Room", value: params.roomName },
-          { name: "Date", value: dateText },
-          { name: "Time", value: timeText },
-          { name: "Status", value: "Pending approval" },
-          { name: "Recurring", value: params.isRecurring ? "Weekly" : "No" },
-          { name: "Catering", value: params.cateringRequested ? "Yes" : "No" },
-          { name: "Tags", value: tagsText },
-          { name: "Reservation ID", value: params.reservationId },
+          { name: "Başlık", value: params.title },
+          { name: "Oda", value: params.roomName },
+          { name: "Tarih", value: dateText },
+          { name: "Saat", value: timeText },
+          { name: "Durum", value: statusLabelMap[params.status] },
+          { name: "Tekrarlı", value: params.isRecurring ? "Haftalık" : "Hayır" },
+          { name: "İkram", value: params.cateringRequested ? "Evet" : "Hayır" },
+          { name: "Etiketler", value: tagsText },
+          { name: "Rezervasyon ID", value: params.reservationId },
         ],
         markdown: true,
       },

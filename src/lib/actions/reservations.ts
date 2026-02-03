@@ -494,6 +494,7 @@ export async function createReservation(
       tags: tags ?? [],
       cateringRequested: cateringRequested ?? false,
       isRecurring,
+      status: "pending",
     });
   }
 
@@ -659,10 +660,28 @@ export async function updateReservationStatus(
     };
   }
 
-  // Fetch the reservation to check if it's in the past
+  // Fetch the reservation to check if it's in the past and for notifications
   const { data: reservation, error: reservationError } = await supabase
     .from("reservations")
-    .select("end_time, is_recurring")
+    .select(
+      `
+      id,
+      title,
+      start_time,
+      end_time,
+      status,
+      tags,
+      catering_requested,
+      is_recurring,
+      rooms (
+        name
+      ),
+      profiles (
+        full_name,
+        email
+      )
+    `
+    )
     .eq("id", id)
     .single();
 
@@ -672,6 +691,8 @@ export async function updateReservationStatus(
       error: "Rezervasyon bulunamadı.",
     };
   }
+
+  const previousStatus = reservation.status as Reservation["status"];
 
   // Prevent modifying past events
   if (new Date(reservation.end_time) < new Date()) {
@@ -693,6 +714,26 @@ export async function updateReservationStatus(
       success: false,
       error: "Rezervasyon durumu güncellenemedi.",
     };
+  }
+
+  if (status === "approved" && previousStatus !== "approved") {
+    const roomName = (reservation.rooms as unknown as { name: string })?.name ?? "Bilinmiyor";
+    const requesterProfile = reservation.profiles as unknown as { full_name: string | null; email: string } | null;
+    const requesterName = requesterProfile?.full_name || requesterProfile?.email || "Bilinmiyor";
+
+    await sendTeamsReservationAlert({
+      reservationId: reservation.id,
+      title: reservation.title,
+      roomName,
+      startTime: reservation.start_time,
+      endTime: reservation.end_time,
+      requesterName,
+      requesterEmail: requesterProfile?.email,
+      tags: reservation.tags ?? [],
+      cateringRequested: reservation.catering_requested ?? false,
+      isRecurring: reservation.is_recurring,
+      status: "approved",
+    });
   }
 
   // If this is a recurring parent reservation, update all child instances too
