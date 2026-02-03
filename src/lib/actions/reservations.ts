@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkAvailability } from "./availability";
 import { ROOM_CAPACITIES, COMBINED_ROOMS } from "@/constants/rooms";
+import { sendTeamsReservationAlert } from "@/lib/notifications/teams";
 
 // Big Event tags that trigger global room lockout
 const BIG_EVENT_TAGS = [
@@ -480,6 +481,21 @@ export async function createReservation(
     .single();
 
   const userName = userProfile?.full_name || userProfile?.email || "Unknown User";
+
+  if (status === "pending") {
+    await sendTeamsReservationAlert({
+      reservationId: reservation.id,
+      title,
+      roomName: room.name,
+      startTime,
+      endTime,
+      requesterName: userName,
+      requesterEmail: userProfile?.email,
+      tags: tags ?? [],
+      cateringRequested: cateringRequested ?? false,
+      isRecurring,
+    });
+  }
 
   // Mock notification system: Log email notifications
   if (status === "pending" || cateringRequested) {
