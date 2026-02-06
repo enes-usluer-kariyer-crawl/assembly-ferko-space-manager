@@ -1647,6 +1647,34 @@ export async function updateReservation(
       cancellationReason: "Rezervasyon güncellendi ve yeniden oluşturuldu.", // Custom reason
     });
 
+    // Send ICS Cancellation to attendees to remove the OLD event from their calendars
+    const oldAttendees = oldReservation.attendees || [];
+    // Ensure requester is included to remove from their calendar too
+    let attendeesToCancel = [...oldAttendees];
+    if (requesterEmail && !attendeesToCancel.includes(requesterEmail)) {
+      attendeesToCancel.push(requesterEmail);
+    }
+
+    if (oldReservation.status === "approved" && attendeesToCancel.length > 0) {
+      const { sendCancellationEmails } = await import("@/lib/email/send-cancellation");
+      await sendCancellationEmails(
+        attendeesToCancel,
+        {
+          id: oldReservation.id,
+          title: oldReservation.title,
+          description: oldReservation.description ?? undefined,
+          startTime: oldReservation.start_time,
+          endTime: oldReservation.end_time,
+          roomName: (oldReservation.rooms as any)?.name || "Unknown Room",
+        },
+        {
+          name: (oldReservation.profiles as any)?.full_name || "Unknown Owner",
+          email: requesterEmail || "unknown@email.com",
+        }
+      );
+      console.log(`[UPDATE] Sent ICS cancellation for old event version to ${attendeesToCancel.length} recipients.`);
+    }
+
     // 2. Send New Reservation Notification (Pending/Approved)
     await sendReservationNotification({
       notificationType: "pending", // Use 'pending' template as a general "New Request/Update" notification for admins
