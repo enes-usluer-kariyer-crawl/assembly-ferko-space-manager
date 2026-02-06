@@ -250,7 +250,10 @@ export function ReservationDetailDialog({
             {event.resource.description && (
               <div className="flex items-start gap-3 text-muted-foreground">
                 <FileText className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                <p className="text-foreground">{event.resource.description}</p>
+                <div
+                  className="prose prose-sm max-w-none text-foreground [&_img]:max-w-full [&_img]:rounded-md"
+                  dangerouslySetInnerHTML={{ __html: event.resource.description }}
+                />
               </div>
             )}
 

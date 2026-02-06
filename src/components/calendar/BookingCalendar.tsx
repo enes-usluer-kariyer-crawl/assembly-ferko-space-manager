@@ -95,7 +95,9 @@ function EventComponent({ event }: { event: CalendarEvent }) {
           )}
           {event.resource.description && (
             <div className="text-sm">
-              <span className="text-muted-foreground">Açıklama:</span> {event.resource.description}
+              <span className="text-muted-foreground">Açıklama:</span>{" "}
+              {event.resource.description.replace(/<[^>]*>/g, "").slice(0, 100)}
+              {event.resource.description.replace(/<[^>]*>/g, "").length > 100 ? "..." : ""}
             </div>
           )}
           {event.resource.cateringRequested && (

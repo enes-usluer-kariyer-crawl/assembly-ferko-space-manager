@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import {
   Select,
   SelectContent,
@@ -252,8 +252,6 @@ export function NewReservationDialog({
     const formStartTime = formData.get("startTime") as string;
     const formEndDate = formData.get("endDate") as string;
     const formEndTime = formData.get("endTime") as string;
-    const formDescription = formData.get("description") as string;
-
     if (!formTitle?.trim()) {
       setError("Lütfen bir başlık girin.");
       return;
@@ -293,7 +291,7 @@ export function NewReservationDialog({
       const result = await createReservation({
         roomId: formRoomId,
         title: formTitle.trim(),
-        description: formDescription?.trim() || undefined,
+        description: description?.trim() || undefined,
         startTime: startDateTime,
         endTime: endDateTime,
         tags: selectedTags,
@@ -593,14 +591,11 @@ export function NewReservationDialog({
 
             {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="description">Açıklama</Label>
-              <Textarea
-                id="description"
-                name="description"
+              <Label>Açıklama</Label>
+              <RichTextEditor
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Toplantı hakkında ek bilgi (opsiyonel)"
-                rows={2}
+                onChange={setDescription}
+                placeholder="Program detayları, katılımcı listesi, görseller ekleyebilirsiniz (opsiyonel)"
               />
             </div>
 
