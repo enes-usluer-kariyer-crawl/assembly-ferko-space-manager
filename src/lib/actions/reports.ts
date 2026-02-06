@@ -28,6 +28,7 @@ export async function getReportStats(days: number = 30): Promise<ReportStats> {
       user:profiles(id, email, full_name)
     `)
     .gte("start_time", startDate.toISOString())
+    .not("tags", "cs", '{"big_event_block"}') // Exclude system blocks
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -62,29 +63,29 @@ export async function getReportStats(days: number = 30): Promise<ReportStats> {
 
     // Only count hours for non-cancelled/rejected events (optional logic, but usually we want consumed capacity)
     // Assuming we want 'usage' stats for approved/completed events:
-    if (res.status === "approved" || res.status === "pending") { 
-       stats.totalHours += durationHours;
-       
-       // 2. Room Stats
-       const roomName = res.room?.name || "Bilinmeyen Oda";
-       const roomId = res.room_id;
-       
-       if (!stats.byRoom[roomId]) {
-         stats.byRoom[roomId] = { name: roomName, count: 0, hours: 0 };
-       }
-       stats.byRoom[roomId].count++;
-       stats.byRoom[roomId].hours += durationHours;
+    if (res.status === "approved" || res.status === "pending") {
+      stats.totalHours += durationHours;
 
-       // 3. User Stats
-       const userId = res.user_id;
-       const userEmail = res.user?.email || "Bilinmeyen";
-       const userName = res.user?.full_name || userEmail;
+      // 2. Room Stats
+      const roomName = res.room?.name || "Bilinmeyen Oda";
+      const roomId = res.room_id;
 
-       if (!stats.byUser[userId]) {
-         stats.byUser[userId] = { email: userEmail, name: userName, count: 0, hours: 0 };
-       }
-       stats.byUser[userId].count++;
-       stats.byUser[userId].hours += durationHours;
+      if (!stats.byRoom[roomId]) {
+        stats.byRoom[roomId] = { name: roomName, count: 0, hours: 0 };
+      }
+      stats.byRoom[roomId].count++;
+      stats.byRoom[roomId].hours += durationHours;
+
+      // 3. User Stats
+      const userId = res.user_id;
+      const userEmail = res.user?.email || "Bilinmeyen";
+      const userName = res.user?.full_name || userEmail;
+
+      if (!stats.byUser[userId]) {
+        stats.byUser[userId] = { email: userEmail, name: userName, count: 0, hours: 0 };
+      }
+      stats.byUser[userId].count++;
+      stats.byUser[userId].hours += durationHours;
     }
   });
 
