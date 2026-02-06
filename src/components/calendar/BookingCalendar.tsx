@@ -116,6 +116,26 @@ function EventComponent({ event }: { event: CalendarEvent }) {
   );
 }
 
+const ROOM_COLORS: Record<string, { dot: string; activeBg: string; activeRing: string }> = {
+  'Büyük Oda':    { dot: 'bg-blue-600',    activeBg: 'bg-blue-100 dark:bg-blue-900/30',      activeRing: 'ring-2 ring-blue-600' },
+  'Demo Odası':   { dot: 'bg-amber-500',   activeBg: 'bg-orange-100 dark:bg-orange-900/30',   activeRing: 'ring-2 ring-orange-500' },
+  'Eğitim Odası': { dot: 'bg-emerald-600', activeBg: 'bg-emerald-100 dark:bg-emerald-900/30', activeRing: 'ring-2 ring-emerald-600' },
+  'Koltuklu Oda': { dot: 'bg-purple-600',  activeBg: 'bg-purple-100 dark:bg-purple-900/30',   activeRing: 'ring-2 ring-purple-600' },
+  'Masalı Oda':   { dot: 'bg-rose-600',    activeBg: 'bg-rose-100 dark:bg-rose-900/30',       activeRing: 'ring-2 ring-rose-600' },
+};
+
+const DEFAULT_ROOM_COLOR = { dot: 'bg-gray-500', activeBg: 'bg-gray-100 dark:bg-gray-900/30', activeRing: 'ring-2 ring-gray-500' };
+
+const FEATURE_LABELS: Record<string, string> = {
+  'projector': 'Projektör',
+  'whiteboard': 'Beyaz Tahta',
+  'video_conference': 'Video Konferans',
+  'sound_system': 'Ses Sistemi',
+  'tv_screen': 'TV Ekranı',
+  'comfortable_seating': 'Konforlu Oturma',
+  'desk': 'Masa',
+};
+
 type BookingCalendarProps = {
   initialReservations: Reservation[];
   rooms: Room[];
@@ -387,41 +407,50 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
               Tüm Odaları Göster
             </button>
           )}
-          <button
-            onClick={() => setSelectedRoomFilter(selectedRoomFilter === 'Büyük Oda' ? null : 'Büyük Oda')}
-            className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${selectedRoomFilter === 'Büyük Oda' ? 'bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-600' : 'hover:bg-muted'}`}
-          >
-            <div className="w-3 h-3 rounded bg-blue-600"></div>
-            <span className={`text-sm ${selectedRoomFilter === 'Büyük Oda' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>Büyük Oda</span>
-          </button>
-          <button
-            onClick={() => setSelectedRoomFilter(selectedRoomFilter === 'Demo Odası' ? null : 'Demo Odası')}
-            className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${selectedRoomFilter === 'Demo Odası' ? 'bg-orange-100 dark:bg-orange-900/30 ring-2 ring-orange-500' : 'hover:bg-muted'}`}
-          >
-            <div className="w-3 h-3 rounded bg-amber-500"></div>
-            <span className={`text-sm ${selectedRoomFilter === 'Demo Odası' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>Demo Odası</span>
-          </button>
-          <button
-            onClick={() => setSelectedRoomFilter(selectedRoomFilter === 'Eğitim Odası' ? null : 'Eğitim Odası')}
-            className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${selectedRoomFilter === 'Eğitim Odası' ? 'bg-emerald-100 dark:bg-emerald-900/30 ring-2 ring-emerald-600' : 'hover:bg-muted'}`}
-          >
-            <div className="w-3 h-3 rounded bg-emerald-600"></div>
-            <span className={`text-sm ${selectedRoomFilter === 'Eğitim Odası' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>Eğitim Odası</span>
-          </button>
-          <button
-            onClick={() => setSelectedRoomFilter(selectedRoomFilter === 'Koltuklu Oda' ? null : 'Koltuklu Oda')}
-            className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${selectedRoomFilter === 'Koltuklu Oda' ? 'bg-purple-100 dark:bg-purple-900/30 ring-2 ring-purple-600' : 'hover:bg-muted'}`}
-          >
-            <div className="w-3 h-3 rounded bg-purple-600"></div>
-            <span className={`text-sm ${selectedRoomFilter === 'Koltuklu Oda' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>Koltuklu Oda</span>
-          </button>
-          <button
-            onClick={() => setSelectedRoomFilter(selectedRoomFilter === 'Masalı Oda' ? null : 'Masalı Oda')}
-            className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${selectedRoomFilter === 'Masalı Oda' ? 'bg-rose-100 dark:bg-rose-900/30 ring-2 ring-rose-600' : 'hover:bg-muted'}`}
-          >
-            <div className="w-3 h-3 rounded bg-rose-600"></div>
-            <span className={`text-sm ${selectedRoomFilter === 'Masalı Oda' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>Masalı Oda</span>
-          </button>
+          {rooms.map((room) => {
+            const colors = ROOM_COLORS[room.name] || DEFAULT_ROOM_COLOR;
+            const isSelected = selectedRoomFilter === room.name;
+            return (
+              <Tooltip key={room.id}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setSelectedRoomFilter(isSelected ? null : room.name)}
+                    className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${
+                      isSelected ? `${colors.activeBg} ${colors.activeRing}` : 'hover:bg-muted'
+                    }`}
+                  >
+                    <div className={`w-3 h-3 rounded ${colors.dot}`}></div>
+                    <span className={`text-sm ${isSelected ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                      {room.name}
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="p-0 overflow-hidden rounded-lg max-w-xs">
+                  <div className="flex flex-col">
+                    {room.img && (
+                      <img
+                        src={room.img}
+                        alt={room.name}
+                        className="w-64 h-40 object-cover"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    )}
+                    <div className="p-3 space-y-1">
+                      <div className="font-semibold text-sm">{room.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Kapasite: {room.capacity} kişi
+                      </div>
+                      {room.features.length > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          {room.features.map(f => FEATURE_LABELS[f] || f.replace(/_/g, ' ')).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
         </div>
 
         {/* Calendar */}

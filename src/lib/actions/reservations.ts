@@ -26,6 +26,7 @@ export type Room = {
   capacity: number;
   features: string[];
   is_active: boolean;
+  img: string | null;
 };
 
 export type Reservation = {
@@ -201,7 +202,7 @@ export async function getRooms(): Promise<{
 
     const { data, error } = await supabase
       .from("rooms")
-      .select("id, name, capacity, features, is_active")
+      .select("id, name, capacity, features, is_active, img")
       .eq("is_active", true)
       .order("name", { ascending: true });
 
