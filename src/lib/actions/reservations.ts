@@ -5,16 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { checkAvailability } from "./availability";
 import { ROOM_CAPACITIES, COMBINED_ROOMS } from "@/constants/rooms";
 import { sendTeamsReservationAlert } from "@/lib/notifications/teams";
+import { BIG_EVENT_TAGS, BIG_EVENT_BLOCK_LABEL } from "@/constants/events";
 
-// Big Event tags that trigger global room lockout
-const BIG_EVENT_TAGS = [
-  "ÖM-Success Meetings",
-  "Exco Toplantısı",
-  "ÖM- HR Small Talks",
-] as const;
 
-// Label for blocked placeholder reservations
-const BIG_EVENT_BLOCK_LABEL = "Ofis Kapalı - Büyük Etkinlik";
 
 function isBigEventRequest(tags: string[]): boolean {
   return tags.some((tag) => BIG_EVENT_TAGS.includes(tag as (typeof BIG_EVENT_TAGS)[number]));
@@ -440,7 +433,10 @@ export async function createReservation(
 
   // For Big Events: Check for existing bookings that conflict and BLOCK creation
   // Admin must manually cancel these reservations first
-  if (isBigEvent) {
+  // EXCEPTION: University Events do NOT block other rooms
+  const isUniversityEvent = tags?.includes("Üniversite Etkinliği");
+
+  if (isBigEvent && !isUniversityEvent) {
     // Calculate buffered times (30 mins before and after)
     const start = new Date(startTime);
     const end = new Date(endTime);
@@ -506,6 +502,7 @@ export async function createReservation(
       description: description ?? null,
       start_time: startTime,
       end_time: endTime,
+      updated_at: new Date().toISOString(),
       status,
       tags: tags ?? [],
       attendees: finalAttendees,
@@ -649,7 +646,8 @@ export async function createReservation(
   }
 
   // For Big Events: Create blocked placeholder reservations for ALL OTHER ROOMS
-  if (isBigEvent) {
+  // EXCEPTION: University Events do NOT block other rooms
+  if (isBigEvent && !isUniversityEvent) {
     // Get all other active rooms
     const { data: otherRooms } = await supabase
       .from("rooms")
@@ -1520,29 +1518,34 @@ export async function updateReservation(
   const isNowBigEvent = isBigEventRequest(newTags);
 
   if (isNowBigEvent) {
-    // Check conflicts similar to createReservation
-    const start = new Date(newStartTime);
-    const end = new Date(newEndTime);
+    // EXCEPTION: University Events do NOT block other rooms
+    const isUniversityEvent = newTags?.includes("Üniversite Etkinliği");
 
-    const bufferStart = new Date(start);
-    bufferStart.setMinutes(bufferStart.getMinutes() - 30);
-    const bufferEnd = new Date(end);
-    bufferEnd.setMinutes(bufferEnd.getMinutes() + 30);
+    if (!isUniversityEvent) {
+      // Check conflicts similar to createReservation
+      const start = new Date(newStartTime);
+      const end = new Date(newEndTime);
 
-    const { data: bigEventConflicts } = await supabase
-      .from("reservations")
-      .select("id, title")
-      .neq("id", id) // Exclude self
-      .in("status", ["pending", "approved"])
-      .not("tags", "cs", '{"big_event_block"}')
-      .lt("start_time", bufferEnd.toISOString())
-      .gt("end_time", bufferStart.toISOString());
+      const bufferStart = new Date(start);
+      bufferStart.setMinutes(bufferStart.getMinutes() - 30);
+      const bufferEnd = new Date(end);
+      bufferEnd.setMinutes(bufferEnd.getMinutes() + 30);
 
-    if (bigEventConflicts && bigEventConflicts.length > 0) {
-      return {
-        success: false,
-        error: `Bu saat aralığında (hazırlık süresi dahil) ${bigEventConflicts.length} adet toplantı var. Önce bunları iptal etmelisiniz.`
-      };
+      const { data: bigEventConflicts } = await supabase
+        .from("reservations")
+        .select("id, title")
+        .neq("id", id) // Exclude self
+        .in("status", ["pending", "approved"])
+        .not("tags", "cs", '{"big_event_block"}')
+        .lt("start_time", bufferEnd.toISOString())
+        .gt("end_time", bufferStart.toISOString());
+
+      if (bigEventConflicts && bigEventConflicts.length > 0) {
+        return {
+          success: false,
+          error: `Bu saat aralığında (hazırlık süresi dahil) ${bigEventConflicts.length} adet toplantı var. Önce bunları iptal etmelisiniz.`
+        };
+      }
     }
   }
 

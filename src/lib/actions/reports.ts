@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { BIG_EVENT_TAGS } from "@/constants/events";
 
 export type ReportStats = {
   totalReservations: number;
@@ -9,27 +10,64 @@ export type ReportStats = {
   approvedCount: number;
   byRoom: Record<string, { name: string; count: number; hours: number }>;
   byUser: Record<string, { email: string; name: string; count: number; hours: number }>;
+  universityEventCount: number;
+  companyEventCount: number;
+  excoEventCount: number;
   recentActivity: any[];
+  allReservations: any[]; // For Excel export
 };
 
-export async function getReportStats(days: number = 30): Promise<ReportStats> {
+export type ReportFilters = {
+  startDate?: Date;
+  endDate?: Date;
+  roomIds?: string[];
+};
+
+export async function getReportStats(filters: ReportFilters = {}): Promise<ReportStats> {
   const supabase = await createClient();
 
-  // Calculate start date
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
+  // Default to last 30 days if dates not provided
+  let end = filters.endDate;
+  if (!end) {
+    end = new Date();
+    end.setHours(23, 59, 59, 999);
+  }
 
-  // Fetch reservations with related data
-  const { data: reservations, error } = await supabase
+  const start = filters.startDate || new Date(new Date().setDate(end.getDate() - 30));
+
+  let query = supabase
     .from("reservations")
     .select(`
       *,
       room:rooms(id, name),
       user:profiles(id, email, full_name)
     `)
-    .gte("start_time", startDate.toISOString())
+    .gte("start_time", start.toISOString())
+    .lte("start_time", end.toISOString())
     .not("tags", "cs", '{"big_event_block"}') // Exclude system blocks
     .order("created_at", { ascending: false });
+  if (filters.roomIds && filters.roomIds.length > 0) {
+    query = query.in("room_id", filters.roomIds);
+  }
+
+  // Parallel fetch: Filtered stats AND Global recent activity
+  const [statsResult, recentResult] = await Promise.all([
+    query,
+    supabase
+      .from("reservations")
+      .select(`
+        *,
+        room:rooms(id, name),
+        user:profiles(id, email, full_name)
+      `)
+      .not("tags", "cs", '{"big_event_block"}')
+      .order("updated_at", { ascending: false })
+      .limit(10)
+  ]);
+
+  const reservations = statsResult.data || [];
+  const recentLogs = recentResult.data || [];
+  const error = statsResult.error || recentResult.error;
 
   if (error) {
     console.error("Error fetching report stats:", error);
@@ -44,7 +82,11 @@ export async function getReportStats(days: number = 30): Promise<ReportStats> {
     approvedCount: 0,
     byRoom: {},
     byUser: {},
-    recentActivity: reservations.slice(0, 10), // Last 10 actions
+    universityEventCount: 0,
+    companyEventCount: 0,
+    excoEventCount: 0,
+    recentActivity: recentLogs, // Use global recent logs
+    allReservations: reservations, // Return all filtered for export
   };
 
   reservations.forEach((res) => {
@@ -61,8 +103,7 @@ export async function getReportStats(days: number = 30): Promise<ReportStats> {
     const end = new Date(res.end_time);
     const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
 
-    // Only count hours for non-cancelled/rejected events (optional logic, but usually we want consumed capacity)
-    // Assuming we want 'usage' stats for approved/completed events:
+    // Only count hours for non-cancelled/rejected events
     if (res.status === "approved" || res.status === "pending") {
       stats.totalHours += durationHours;
 
@@ -86,6 +127,16 @@ export async function getReportStats(days: number = 30): Promise<ReportStats> {
       }
       stats.byUser[userId].count++;
       stats.byUser[userId].hours += durationHours;
+
+      // 4. Event Type Stats
+      const tags = res.tags || [];
+      if (tags.includes("Üniversite Etkinliği")) {
+        stats.universityEventCount++;
+      } else if (tags.includes("Exco Toplantısı")) {
+        stats.excoEventCount++;
+      } else if (tags.some((tag: string) => BIG_EVENT_TAGS.includes(tag as any))) {
+        stats.companyEventCount++;
+      }
     }
   });
 

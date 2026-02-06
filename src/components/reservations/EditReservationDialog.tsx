@@ -29,13 +29,10 @@ import {
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 
 import { updateReservation, type Room } from "@/lib/actions/reservations";
+import { BIG_EVENT_TAGS } from "@/constants/events";
 import { ROOM_CAPACITIES } from "@/constants/rooms";
 
-const BIG_EVENT_TAGS = [
-    "ÖM-Success Meetings",
-    "Exco Toplantısı",
-    "ÖM- HR Small Talks",
-];
+
 
 type EditReservationDialogProps = {
     reservation: {
@@ -305,7 +302,7 @@ export function EditReservationDialog({
                     <div className="space-y-2">
                         <Label>Etiketler (Büyük Etkinlikler)</Label>
                         <div className="flex flex-col space-y-2 rounded-md border p-3">
-                            {BIG_EVENT_TAGS.map((tag) => (
+                            {BIG_EVENT_TAGS.map((tag: string) => (
                                 <div key={tag} className="flex items-center gap-2">
                                     <input
                                         type="radio"

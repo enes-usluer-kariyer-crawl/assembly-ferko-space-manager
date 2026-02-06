@@ -26,8 +26,8 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 
-import type { Room, ConflictingReservation } from "@/lib/actions/reservations";
-import { createReservation } from "@/lib/actions/reservations";
+import { createReservation, type Room, type ConflictingReservation } from "@/lib/actions/reservations";
+import { BIG_EVENT_TAGS } from "@/constants/events";
 import { ROOM_CAPACITIES } from "@/constants/rooms";
 import { AlertTriangle, Plus, X, Mail } from "lucide-react";
 
@@ -40,12 +40,6 @@ type NewReservationDialogProps = {
   initialRoomId?: string;
   onSuccess: () => void;
 };
-
-const BIG_EVENT_TAGS = [
-  "ÖM-Success Meetings",
-  "Exco Toplantısı",
-  "ÖM- HR Small Talks",
-];
 
 function SubmitButton({ disabled }: { disabled?: boolean }) {
   const { pending } = useFormStatus();
