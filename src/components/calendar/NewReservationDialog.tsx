@@ -103,6 +103,7 @@ export function NewReservationDialog({
   const [attendees, setAttendees] = useState<string[]>([]);
   const [attendeeInput, setAttendeeInput] = useState("");
   const [attendeeError, setAttendeeError] = useState<string | null>(null);
+  const [allDay, setAllDay] = useState(false);
 
   // Get tomorrow's date in YYYY-MM-DD format for min date validation
   const calculateMinDate = () => {
@@ -126,6 +127,7 @@ export function NewReservationDialog({
       setAttendees([]);
       setAttendeeInput("");
       setAttendeeError(null);
+      setAllDay(false);
 
       if (initialStartTime) {
         setStartDate(format(initialStartTime, "yyyy-MM-dd"));
@@ -144,6 +146,64 @@ export function NewReservationDialog({
       }
     }
   }, [open, initialStartTime, initialEndTime]);
+
+  // When "Tüm Gün" is toggled, set end time to 23:59 and sync end date with start date
+  const handleAllDayToggle = (checked: boolean) => {
+    setAllDay(checked);
+    if (checked) {
+      setEndTime("23:59");
+      if (startDate) {
+        setEndDate(startDate);
+      }
+    }
+  };
+
+  // When start time changes, ensure end time is not before it (same date)
+  const handleStartTimeChange = (value: string) => {
+    setStartTime(value);
+    if (allDay) {
+      // allDay mode: keep end time at 23:59
+      return;
+    }
+    // If same date and end time is before new start time, auto-adjust end time
+    if (startDate && endDate && startDate === endDate && endTime && value > endTime) {
+      setEndTime(value);
+    }
+  };
+
+  // When end time changes, prevent setting it before start time on the same date
+  const handleEndTimeChange = (value: string) => {
+    if (startDate && endDate && startDate === endDate && startTime && value < startTime) {
+      // Don't allow end time before start time on the same date
+      return;
+    }
+    setEndTime(value);
+  };
+
+  // When start date changes, sync end date if allDay and validate time
+  const handleStartDateChange = (value: string) => {
+    setStartDate(value);
+    if (allDay) {
+      setEndDate(value);
+    }
+    // If end date is before start date, set end date to start date
+    if (endDate && value > endDate) {
+      setEndDate(value);
+    }
+    // If dates become the same, check time validity
+    if (endDate === value && startTime && endTime && startTime > endTime) {
+      setEndTime(startTime);
+    }
+  };
+
+  // When end date changes, validate against start date
+  const handleEndDateChange = (value: string) => {
+    setEndDate(value);
+    // If same date, ensure end time is not before start time
+    if (value === startDate && startTime && endTime && endTime < startTime) {
+      setEndTime(startTime);
+    }
+  };
 
   const handleTagToggle = (tag: string) => {
     setSelectedTags((prev) =>
@@ -373,7 +433,7 @@ export function NewReservationDialog({
                   name="startDate"
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
                   min={minDateStr}
                 />
               </div>
@@ -384,7 +444,7 @@ export function NewReservationDialog({
                   name="startTime"
                   type="time"
                   value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
+                  onChange={(e) => handleStartTimeChange(e.target.value)}
                 />
               </div>
 
@@ -395,8 +455,9 @@ export function NewReservationDialog({
                   name="endDate"
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
                   min={startDate || minDateStr}
+                  disabled={allDay}
                 />
               </div>
               <div className="space-y-2">
@@ -406,10 +467,25 @@ export function NewReservationDialog({
                   name="endTime"
                   type="time"
                   value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
+                  onChange={(e) => handleEndTimeChange(e.target.value)}
+                  min={startDate === endDate ? startTime : undefined}
+                  disabled={allDay}
                 />
               </div>
             </div>
+
+            {/* Tüm Gün checkbox */}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="allDay"
+                checked={allDay}
+                onCheckedChange={(checked) => handleAllDayToggle(checked === true)}
+              />
+              <Label htmlFor="allDay" className="font-normal cursor-pointer">
+                Tüm gün (başlangıç saatinden gün sonuna kadar)
+              </Label>
+            </div>
+
             <p className="text-xs text-muted-foreground">
               Hazırlık süreçleri nedeniyle en erken yarına rezervasyon oluşturabilirsiniz.
             </p>
