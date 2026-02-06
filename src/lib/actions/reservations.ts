@@ -486,6 +486,14 @@ export async function createReservation(
 
   const isRecurring = recurrencePattern !== undefined && recurrencePattern !== "none";
 
+  // Ensure requester is in attendees list to receive calendar invite
+  const requesterEmail = user.email;
+  const finalAttendees = [...(attendees ?? [])];
+
+  if (requesterEmail && !finalAttendees.includes(requesterEmail)) {
+    finalAttendees.push(requesterEmail);
+  }
+
   // Insert main reservation
   // For recurring events, we no longer create child instances upfront.
   // Instead, the calendar will dynamically generate recurring instances.
@@ -500,7 +508,7 @@ export async function createReservation(
       end_time: endTime,
       status,
       tags: tags ?? [],
-      attendees: attendees ?? [],
+      attendees: finalAttendees,
       catering_requested: cateringRequested ?? false,
       is_recurring: isRecurring,
       recurrence_pattern: recurrencePattern ?? "none",
@@ -541,7 +549,7 @@ export async function createReservation(
       endTime,
       requesterName: userName,
       requesterEmail: userProfile?.email,
-      attendees: attendees ?? [],
+      attendees: finalAttendees ?? [],
       tags: tags ?? [],
       cateringRequested: cateringRequested ?? false,
       isRecurring,
@@ -613,11 +621,11 @@ export async function createReservation(
   }
 
   // Send invitation emails to attendees only when the reservation is approved
-  if (status === "approved" && attendees && attendees.length > 0) {
+  if (status === "approved" && finalAttendees && finalAttendees.length > 0) {
     const { sendInvitationEmails } = await import("@/lib/email/send-invitation");
 
     const { sent, failed } = await sendInvitationEmails(
-      attendees,
+      finalAttendees,
       {
         id: reservation.id,
         title,
@@ -1559,6 +1567,14 @@ export async function updateReservation(
 
   // --- UPDATE DATABASE ---
 
+  const requesterEmail = (oldReservation.profiles as any)?.email;
+  let updatedAttendees = attendees !== undefined ? attendees : (oldReservation.attendees || []);
+
+  // Ensure requester is in attendees list
+  if (requesterEmail && !updatedAttendees.includes(requesterEmail)) {
+    updatedAttendees = [...updatedAttendees, requesterEmail];
+  }
+
   const isRecurring = (recurrencePattern !== undefined && recurrencePattern !== "none") ||
     (recurrencePattern === undefined && oldReservation.is_recurring);
 
@@ -1569,7 +1585,7 @@ export async function updateReservation(
     start_time: newStartTime,
     end_time: newEndTime,
     room_id: newRoomId,
-    attendees: attendees !== undefined ? attendees : oldReservation.attendees,
+    attendees: updatedAttendees,
     catering_requested: cateringRequested !== undefined ? cateringRequested : oldReservation.catering_requested,
     tags: newTags,
     is_recurring: isRecurring,
@@ -1626,24 +1642,12 @@ export async function updateReservation(
       },
       requester: {
         name: (oldReservation.profiles as any)?.full_name || "Unknown",
-        email: (oldReservation.profiles as any)?.email || "unknown@email.com",
+        email: requesterEmail || "unknown@email.com",
       },
       cancellationReason: "Rezervasyon güncellendi ve yeniden oluşturuldu.", // Custom reason
     });
 
     // 2. Send New Reservation Notification (Pending/Approved)
-    // Determine status: if user is admin -> Approved, else -> Pending
-    // Just reuse the logic. If it was already approved and user is not admin, it might go back to pending?
-    // User logic: If USER edits, it usually goes to Pending again unless logic says otherwise. 
-    // BUT we didn't change status in DB above unless requested. 
-    // Ideally if important fields changed (time, room), it should maybe go to PENDING? 
-    // For now, let's assume status stays same or follows create logic (Admin->Approved, User->Pending).
-    // Let's force update status if non-admin changed time/room?
-    // Current requirement doesn't specify status change logic on edit. Assuming status remains or is approved.
-
-    // Let's send notification about the NEW state as "Update"
-    // Since we don't have "updated" type, we can send "pending" or "approved" based on current status.
-
     await sendReservationNotification({
       notificationType: "pending", // Use 'pending' template as a general "New Request/Update" notification for admins
       reservation: {
@@ -1664,6 +1668,30 @@ export async function updateReservation(
         email: userEmail,
       },
     });
+
+    // 3. Send Invitation Emails (Calendar Invite) for the NEW details
+    if (oldReservation.status === "approved" && updatedAttendees && updatedAttendees.length > 0) {
+      const { sendInvitationEmails } = await import("@/lib/email/send-invitation");
+      const roomName = newRoomId === oldReservation.room_id
+        ? (oldReservation.rooms as any)?.name
+        : (await supabase.from("rooms").select("name").eq("id", newRoomId).single()).data?.name || "Unknown";
+
+      await sendInvitationEmails(
+        updatedAttendees,
+        {
+          id: id,
+          title: updateData.title as string,
+          description: updateData.description as string | undefined,
+          startTime: newStartTime,
+          endTime: newEndTime,
+          roomName: roomName,
+        },
+        {
+          name: userName,
+          email: userEmail,
+        }
+      );
+    }
 
   } catch (err) {
     console.error("Error sending update notifications:", err);
