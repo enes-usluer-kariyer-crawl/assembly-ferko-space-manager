@@ -17,7 +17,6 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.93.1",
-    "@tailwindcss/typography": "^0.5.19",
     "@tiptap/extension-image": "^3.19.0",
     "@tiptap/extension-link": "^3.19.0",
     "@tiptap/pm": "^3.19.0",
@@ -40,6 +39,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^22",
     "@types/react": "19.2.9",
     "@types/react-big-calendar": "^1.16.3",
