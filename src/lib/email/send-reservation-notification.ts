@@ -1,6 +1,6 @@
 "use server";
 
-type NotificationType = "pending" | "approved";
+type NotificationType = "pending" | "approved" | "cancelled";
 
 type ReservationNotificationParams = {
     notificationType: NotificationType;
@@ -19,6 +19,7 @@ type ReservationNotificationParams = {
         name: string;
         email: string;
     };
+    cancellationReason?: string;
 };
 
 type ReservationNotificationResult = {

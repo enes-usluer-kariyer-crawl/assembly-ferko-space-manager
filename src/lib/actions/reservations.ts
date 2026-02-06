@@ -1422,6 +1422,11 @@ export type UpdateReservationInput = {
   roomId?: string;
   attendees?: string[];
   cateringRequested?: boolean;
+  tags?: string[];
+  recurrencePattern?: RecurrencePattern;
+  recurrenceEndType?: RecurrenceEndType;
+  recurrenceCount?: number;
+  recurrenceEndDate?: string;
 };
 
 export type UpdateReservationResult = {
@@ -1432,7 +1437,7 @@ export type UpdateReservationResult = {
 export async function updateReservation(
   input: UpdateReservationInput
 ): Promise<UpdateReservationResult> {
-  const { id, title, description, startTime, endTime, roomId, attendees, cateringRequested } = input;
+  const { id, title, description, startTime, endTime, roomId, attendees, cateringRequested, tags, recurrencePattern, recurrenceEndType, recurrenceCount, recurrenceEndDate } = input;
 
   if (!id) {
     return { success: false, error: "Rezervasyon ID gereklidir." };
@@ -1459,39 +1464,82 @@ export async function updateReservation(
 
   const isAdmin = profile?.role === "admin";
 
-  // Fetch the reservation
-  const { data: reservation, error: reservationError } = await supabase
+  // Fetch the OLD reservation before update
+  const { data: oldReservation, error: reservationError } = await supabase
     .from("reservations")
-    .select("*, rooms(name)")
+    .select("*, rooms(name), profiles(full_name, email)")
     .eq("id", id)
     .single();
 
-  if (reservationError || !reservation) {
+  if (reservationError || !oldReservation) {
     return { success: false, error: "Rezervasyon bulunamadı." };
   }
 
   // Check authorization: user must be owner or admin
-  if (reservation.user_id !== user.id && !isAdmin) {
+  if (oldReservation.user_id !== user.id && !isAdmin) {
     return { success: false, error: "Bu rezervasyonu düzenleme yetkiniz yok." };
   }
 
   // Prevent editing past reservations
-  if (new Date(reservation.end_time) < new Date()) {
+  if (new Date(oldReservation.end_time) < new Date()) {
     return { success: false, error: "Geçmiş rezervasyonlar düzenlenemez." };
   }
 
   // Only allow editing pending or approved reservations
-  if (!["pending", "approved"].includes(reservation.status)) {
+  if (!["pending", "approved"].includes(oldReservation.status)) {
     return { success: false, error: "Bu durumda rezervasyon düzenlenemez." };
   }
 
-  // If changing room, check room availability
-  const newStartTime = startTime || reservation.start_time;
-  const newEndTime = endTime || reservation.end_time;
-  const newRoomId = roomId || reservation.room_id;
+  // Determine new values or fallback to old ones
+  const newStartTime = startTime || oldReservation.start_time;
+  const newEndTime = endTime || oldReservation.end_time;
+  const newRoomId = roomId || oldReservation.room_id;
+  const newTags = tags || oldReservation.tags || [];
 
+  // Check date validity if changed
+  if (startTime || endTime) {
+    const start = new Date(newStartTime);
+    const end = new Date(newEndTime);
+
+    if (end <= start) {
+      return { success: false, error: "Bitiş zamanı başlangıç zamanından sonra olmalıdır." };
+    }
+  }
+
+  // --- CONFLICT CHECKS ---
+
+  // 1. Big Event Conflict Check (If updating to Big Event tags)
+  const isNowBigEvent = isBigEventRequest(newTags);
+
+  if (isNowBigEvent) {
+    // Check conflicts similar to createReservation
+    const start = new Date(newStartTime);
+    const end = new Date(newEndTime);
+
+    const bufferStart = new Date(start);
+    bufferStart.setMinutes(bufferStart.getMinutes() - 30);
+    const bufferEnd = new Date(end);
+    bufferEnd.setMinutes(bufferEnd.getMinutes() + 30);
+
+    const { data: bigEventConflicts } = await supabase
+      .from("reservations")
+      .select("id, title")
+      .neq("id", id) // Exclude self
+      .in("status", ["pending", "approved"])
+      .not("tags", "cs", '{"big_event_block"}')
+      .lt("start_time", bufferEnd.toISOString())
+      .gt("end_time", bufferStart.toISOString());
+
+    if (bigEventConflicts && bigEventConflicts.length > 0) {
+      return {
+        success: false,
+        error: `Bu saat aralığında (hazırlık süresi dahil) ${bigEventConflicts.length} adet toplantı var. Önce bunları iptal etmelisiniz.`
+      };
+    }
+  }
+
+  // 2. Regular Conflict Check (if room or time changed)
   if (roomId || startTime || endTime) {
-    // Check for conflicts (excluding this reservation)
     const { data: conflicts } = await supabase
       .from("reservations")
       .select("id, title")
@@ -1509,20 +1557,32 @@ export async function updateReservation(
     }
   }
 
-  // Build update object
+  // --- UPDATE DATABASE ---
+
+  const isRecurring = (recurrencePattern !== undefined && recurrencePattern !== "none") ||
+    (recurrencePattern === undefined && oldReservation.is_recurring);
+
   const updateData: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
+    title: title !== undefined ? title : oldReservation.title,
+    description: description !== undefined ? description : oldReservation.description,
+    start_time: newStartTime,
+    end_time: newEndTime,
+    room_id: newRoomId,
+    attendees: attendees !== undefined ? attendees : oldReservation.attendees,
+    catering_requested: cateringRequested !== undefined ? cateringRequested : oldReservation.catering_requested,
+    tags: newTags,
+    is_recurring: isRecurring,
   };
 
-  if (title !== undefined) updateData.title = title;
-  if (description !== undefined) updateData.description = description || null;
-  if (startTime !== undefined) updateData.start_time = startTime;
-  if (endTime !== undefined) updateData.end_time = endTime;
-  if (roomId !== undefined) updateData.room_id = roomId;
-  if (attendees !== undefined) updateData.attendees = attendees;
-  if (cateringRequested !== undefined) updateData.catering_requested = cateringRequested;
+  // Only update recurrence fields if explicitly provided (even if "none")
+  if (recurrencePattern !== undefined) {
+    updateData.recurrence_pattern = recurrencePattern;
+    updateData.recurrence_end_type = recurrenceEndType ?? null;
+    updateData.recurrence_count = recurrenceEndType === "count" ? recurrenceCount : null;
+    updateData.recurrence_end_date = recurrenceEndType === "date" ? recurrenceEndDate : null;
+  }
 
-  // Update the reservation
   const { error: updateError } = await supabase
     .from("reservations")
     .update(updateData)
@@ -1531,6 +1591,83 @@ export async function updateReservation(
   if (updateError) {
     console.error("Error updating reservation:", updateError);
     return { success: false, error: "Rezervasyon güncellenirken bir hata oluştu." };
+  }
+
+  // --- NOTIFICATIONS ---
+
+  // 1. Send Cancellation Email for the OLD version
+  // We send this to Admin team (and requester if needed, handled by notification system logic)
+  try {
+    const { sendReservationNotification } = await import("@/lib/email/send-reservation-notification");
+
+    // Get user details (requester)
+    const { data: currentUserProfile } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", user.id)
+      .single();
+
+    const userName = currentUserProfile?.full_name || currentUserProfile?.email || "Unknown User";
+    const userEmail = currentUserProfile?.email || "";
+
+    // Send Cancellation (Update Notification - Old Version Cancelled)
+    await sendReservationNotification({
+      notificationType: "cancelled",
+      reservation: {
+        id: oldReservation.id,
+        title: oldReservation.title,
+        description: `BİLGİ: Bu rezervasyon, kullanıcısı tarafından güncellendiği için iptal edilmiş ve yerine yenisi oluşturulmuştur.\n\nEski Açıklama: ${oldReservation.description || '-'}`,
+        startTime: oldReservation.start_time,
+        endTime: oldReservation.end_time,
+        roomName: (oldReservation.rooms as any)?.name || "Unknown Room",
+        cateringRequested: oldReservation.catering_requested,
+        isRecurring: oldReservation.is_recurring,
+        recurrencePattern: oldReservation.recurrence_pattern,
+      },
+      requester: {
+        name: (oldReservation.profiles as any)?.full_name || "Unknown",
+        email: (oldReservation.profiles as any)?.email || "unknown@email.com",
+      },
+      cancellationReason: "Rezervasyon güncellendi ve yeniden oluşturuldu.", // Custom reason
+    });
+
+    // 2. Send New Reservation Notification (Pending/Approved)
+    // Determine status: if user is admin -> Approved, else -> Pending
+    // Just reuse the logic. If it was already approved and user is not admin, it might go back to pending?
+    // User logic: If USER edits, it usually goes to Pending again unless logic says otherwise. 
+    // BUT we didn't change status in DB above unless requested. 
+    // Ideally if important fields changed (time, room), it should maybe go to PENDING? 
+    // For now, let's assume status stays same or follows create logic (Admin->Approved, User->Pending).
+    // Let's force update status if non-admin changed time/room?
+    // Current requirement doesn't specify status change logic on edit. Assuming status remains or is approved.
+
+    // Let's send notification about the NEW state as "Update"
+    // Since we don't have "updated" type, we can send "pending" or "approved" based on current status.
+
+    await sendReservationNotification({
+      notificationType: "pending", // Use 'pending' template as a general "New Request/Update" notification for admins
+      reservation: {
+        id: id,
+        title: updateData.title as string,
+        description: `GÜNCELLENEN REZERVASYON\n\n${updateData.description || ''}`,
+        startTime: newStartTime,
+        endTime: newEndTime,
+        roomName: newRoomId === oldReservation.room_id
+          ? (oldReservation.rooms as any)?.name
+          : (await supabase.from("rooms").select("name").eq("id", newRoomId).single()).data?.name || "Unknown",
+        cateringRequested: updateData.catering_requested as boolean,
+        isRecurring: updateData.is_recurring as boolean,
+        recurrencePattern: (updateData.recurrence_pattern as string) || "none",
+      },
+      requester: {
+        name: userName,
+        email: userEmail,
+      },
+    });
+
+  } catch (err) {
+    console.error("Error sending update notifications:", err);
+    // Don't fail the update just because email failed
   }
 
   // Revalidate paths
