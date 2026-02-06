@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 
-import { updateReservation } from "@/lib/actions/reservations";
+import { updateReservation, type Room } from "@/lib/actions/reservations";
 import { ROOM_CAPACITIES } from "@/constants/rooms";
 
 const BIG_EVENT_TAGS = [
@@ -36,12 +36,6 @@ const BIG_EVENT_TAGS = [
     "Exco Toplantısı",
     "ÖM- HR Small Talks",
 ];
-
-type Room = {
-    id: string;
-    name: string;
-    capacity: number;
-};
 
 type EditReservationDialogProps = {
     reservation: {

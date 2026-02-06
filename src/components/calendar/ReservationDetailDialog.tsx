@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EditReservationDialog } from "@/components/reservations/EditReservationDialog";
 
+import { Room } from "@/lib/actions/reservations";
+
 type ReservationDetailDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -43,7 +45,7 @@ type ReservationDetailDialogProps = {
   currentUserId?: string;
   isAdmin?: boolean;
   onCancelled?: () => void;
-  rooms?: { id: string; name: string }[];
+  rooms?: Room[];
 };
 
 function StatusBadge({ status }: { status: string }) {

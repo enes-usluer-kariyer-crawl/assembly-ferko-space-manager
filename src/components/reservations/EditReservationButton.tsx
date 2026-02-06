@@ -3,11 +3,7 @@
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditReservationDialog } from "./EditReservationDialog";
-
-type Room = {
-    id: string;
-    name: string;
-};
+import { Room } from "@/lib/actions/reservations";
 
 type EditButtonProps = {
     reservation: {
@@ -19,6 +15,12 @@ type EditButtonProps = {
         room_id: string;
         attendees?: string[];
         catering_requested?: boolean;
+        tags?: string[];
+        is_recurring?: boolean;
+        recurrence_pattern?: string;
+        recurrence_end_type?: string;
+        recurrence_count?: number;
+        recurrence_end_date?: string;
     };
     rooms: Room[];
 };

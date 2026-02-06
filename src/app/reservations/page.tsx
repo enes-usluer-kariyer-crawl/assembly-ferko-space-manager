@@ -110,6 +110,12 @@ export default async function ReservationsPage() {
                           room_id: reservation.rooms?.id || reservation.room_id,
                           attendees: reservation.attendees,
                           catering_requested: reservation.catering_requested,
+                          tags: reservation.tags,
+                          is_recurring: reservation.is_recurring,
+                          recurrence_pattern: reservation.recurrence_pattern,
+                          recurrence_end_type: reservation.recurrence_end_type,
+                          recurrence_count: reservation.recurrence_count,
+                          recurrence_end_date: reservation.recurrence_end_date,
                         }}
                         rooms={rooms}
                       />
