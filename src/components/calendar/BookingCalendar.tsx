@@ -68,7 +68,7 @@ function EventComponent({ event }: { event: CalendarEvent }) {
             {event.title}
           </div>
           {/* Owner: Hidden on card, visible in tooltip */}
-          
+
           {/* Icons row - show for all events, smaller for short ones */}
           {(event.resource.isRecurring || event.resource.cateringRequested) && (
             <div className={`${isShort ? '' : 'mt-auto'} flex items-center gap-0.5 justify-end opacity-80`}>
@@ -521,6 +521,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           currentUserId={currentUserId}
           isAdmin={isAdmin}
           onCancelled={onRefresh}
+          rooms={rooms}
         />
       </div>
     </TooltipProvider>

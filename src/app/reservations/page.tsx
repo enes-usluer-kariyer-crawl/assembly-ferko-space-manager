@@ -3,6 +3,8 @@ import { CalendarDays, Repeat } from "lucide-react";
 
 import { CancelReservationButton } from "@/components/reservations/CancelReservationButton";
 import { CancelRecurringButton } from "@/components/reservations/CancelRecurringButton";
+import { EditReservationButton } from "@/components/reservations/EditReservationButton";
+import { getRooms } from "@/lib/actions/reservations";
 
 export default async function ReservationsPage() {
   const supabase = await createClient();
@@ -25,22 +27,27 @@ export default async function ReservationsPage() {
     );
   }
 
-  // Only fetch parent/standalone reservations (not recurring children)
-  // For recurring events, we only show the parent and offer cancel options
-  const { data: reservations } = await supabase
-    .from("reservations")
-    .select(`
-      *,
-      rooms (name)
-    `)
-    .eq("user_id", user.id)
-    .in("status", ["pending", "approved"])
-    .is("parent_reservation_id", null)
-    .not("tags", "cs", '{"big_event_block"}')
-    .order("start_time", { ascending: true });
+  // Fetch reservations and rooms in parallel
+  const [reservationsResult, roomsResult] = await Promise.all([
+    supabase
+      .from("reservations")
+      .select(`
+        *,
+        rooms (id, name)
+      `)
+      .eq("user_id", user.id)
+      .in("status", ["pending", "approved"])
+      .is("parent_reservation_id", null)
+      .not("tags", "cs", '{"big_event_block"}')
+      .order("start_time", { ascending: true }),
+    getRooms(),
+  ]);
+
+  const reservations = reservationsResult.data ?? [];
+  const rooms = roomsResult.success ? roomsResult.data ?? [] : [];
 
   // Filter: for non-recurring, only show future. For recurring, always show (they repeat)
-  const filteredReservations = (reservations ?? []).filter((r) => {
+  const filteredReservations = reservations.filter((r) => {
     if (r.is_recurring) return true;
     return new Date(r.end_time) >= new Date();
   });
@@ -91,6 +98,22 @@ export default async function ReservationsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* Edit Button - only for future reservations */}
+                    {isFuture && (
+                      <EditReservationButton
+                        reservation={{
+                          id: reservation.id,
+                          title: reservation.title,
+                          description: reservation.description,
+                          start_time: reservation.start_time,
+                          end_time: reservation.end_time,
+                          room_id: reservation.rooms?.id || reservation.room_id,
+                          attendees: reservation.attendees,
+                          catering_requested: reservation.catering_requested,
+                        }}
+                        rooms={rooms}
+                      />
+                    )}
                     {canCancel && (
                       isRecurring ? (
                         <CancelRecurringButton
@@ -103,21 +126,20 @@ export default async function ReservationsPage() {
                       )
                     )}
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        reservation.status === "approved"
-                          ? "bg-green-100 text-green-800"
-                          : reservation.status === "pending"
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${reservation.status === "approved"
+                        ? "bg-green-100 text-green-800"
+                        : reservation.status === "pending"
                           ? "bg-yellow-100 text-yellow-800"
                           : "bg-red-100 text-red-800"
-                      }`}
+                        }`}
                     >
                       {reservation.status === "approved"
                         ? "Onaylandı"
                         : reservation.status === "pending"
-                        ? "Onay Bekliyor"
-                        : reservation.status === "cancelled"
-                        ? "İptal Edildi"
-                        : "Reddedildi"}
+                          ? "Onay Bekliyor"
+                          : reservation.status === "cancelled"
+                            ? "İptal Edildi"
+                            : "Reddedildi"}
                     </span>
                   </div>
                 </div>

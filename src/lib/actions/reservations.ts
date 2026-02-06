@@ -42,7 +42,10 @@ export type Reservation = {
   attendees?: string[];
   catering_requested: boolean;
   is_recurring: boolean;
-  recurrence_pattern: "none" | "weekly";
+  recurrence_pattern: "none" | "daily" | "weekly" | "biweekly" | "monthly";
+  recurrence_end_type?: "never" | "count" | "date";
+  recurrence_count?: number;
+  recurrence_end_date?: string;
   parent_reservation_id: string | null;
   rooms: {
     id: string;
@@ -86,6 +89,9 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
       catering_requested,
       is_recurring,
       recurrence_pattern,
+      recurrence_end_type,
+      recurrence_count,
+      recurrence_end_date,
       parent_reservation_id,
       rooms (
         id,
@@ -139,24 +145,55 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
   const viewEnd = params?.endDate ? new Date(params.endDate) : defaultViewEnd;
 
   for (const reservation of baseReservations) {
-    if (reservation.is_recurring && reservation.recurrence_pattern === "weekly") {
-      // Generate recurring instances within the view range
+    const pattern = reservation.recurrence_pattern;
+
+    // Check if this is a recurring event
+    if (reservation.is_recurring && pattern !== "none") {
       const originalStart = new Date(reservation.start_time);
       const originalEnd = new Date(reservation.end_time);
       const duration = originalEnd.getTime() - originalStart.getTime();
+
+      // Determine the recurrence end condition
+      const endType = reservation.recurrence_end_type || "never";
+      const maxCount = reservation.recurrence_count || 52;
+      const endDate = reservation.recurrence_end_date ? new Date(reservation.recurrence_end_date) : null;
 
       // Add the original event if it falls within the range
       if (originalStart <= viewEnd && originalEnd >= viewStart) {
         expandedReservations.push(reservation);
       }
 
-      // Generate future instances (up to 52 weeks = 1 year from original date)
-      let week = 1;
-      while (week <= 52) {
-        const instanceStart = new Date(originalStart);
-        instanceStart.setDate(instanceStart.getDate() + (week * 7));
+      // Helper function to get next occurrence date
+      const getNextOccurrence = (baseDate: Date, occurrence: number): Date => {
+        const nextDate = new Date(baseDate);
+        switch (pattern) {
+          case "daily":
+            nextDate.setDate(nextDate.getDate() + occurrence);
+            break;
+          case "weekly":
+            nextDate.setDate(nextDate.getDate() + (occurrence * 7));
+            break;
+          case "biweekly":
+            nextDate.setDate(nextDate.getDate() + (occurrence * 14));
+            break;
+          case "monthly":
+            nextDate.setMonth(nextDate.getMonth() + occurrence);
+            break;
+        }
+        return nextDate;
+      };
 
-        // Stop if we're past the view range
+      // Maximum iterations to prevent infinite loops
+      const maxIterations = pattern === "daily" ? 365 : pattern === "monthly" ? 24 : 52;
+      let occurrence = 1;
+      let generatedCount = 1; // Original event counts as 1
+
+      while (occurrence <= maxIterations) {
+        const instanceStart = getNextOccurrence(originalStart, occurrence);
+
+        // Check end conditions
+        if (endType === "count" && generatedCount >= maxCount) break;
+        if (endType === "date" && endDate && instanceStart > endDate) break;
         if (instanceStart > viewEnd) break;
 
         const instanceEnd = new Date(instanceStart.getTime() + duration);
@@ -165,17 +202,18 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
         if (instanceEnd >= viewStart) {
           expandedReservations.push({
             ...reservation,
-            id: `${reservation.id}_week${week}`, // Virtual ID for recurring instance
+            id: `${reservation.id}_${pattern}${occurrence}`,
             start_time: instanceStart.toISOString(),
             end_time: instanceEnd.toISOString(),
-            parent_reservation_id: reservation.id, // Link back to parent
+            parent_reservation_id: reservation.id,
           });
+          generatedCount++;
         }
 
-        week++;
+        occurrence++;
       }
     } else {
-      // Non-recurring event - include all (no date filtering for base query)
+      // Non-recurring event - include all
       expandedReservations.push(reservation);
     }
   }
@@ -231,6 +269,9 @@ export async function getRooms(): Promise<{
   }
 }
 
+export type RecurrencePattern = "none" | "daily" | "weekly" | "biweekly" | "monthly";
+export type RecurrenceEndType = "never" | "count" | "date";
+
 export type CreateReservationInput = {
   roomId: string;
   title: string;
@@ -239,7 +280,10 @@ export type CreateReservationInput = {
   endTime: string;
   tags?: string[];
   cateringRequested?: boolean;
-  recurrencePattern?: "none" | "weekly";
+  recurrencePattern?: RecurrencePattern;
+  recurrenceEndType?: RecurrenceEndType;
+  recurrenceCount?: number; // Number of occurrences (used when endType is "count")
+  recurrenceEndDate?: string; // End date (used when endType is "date")
   attendees?: string[];
 };
 
@@ -269,8 +313,10 @@ export type CreateReservationResult = {
 export async function createReservation(
   input: CreateReservationInput
 ): Promise<CreateReservationResult> {
-  const { roomId, title, description, startTime, endTime, tags, cateringRequested, recurrencePattern, attendees } =
-    input;
+  const {
+    roomId, title, description, startTime, endTime, tags, cateringRequested,
+    recurrencePattern, recurrenceEndType, recurrenceCount, recurrenceEndDate, attendees
+  } = input;
 
   // Validate required fields
   if (!roomId || !title || !startTime || !endTime) {
@@ -301,7 +347,7 @@ export async function createReservation(
   // Prevent booking in the past or same day (must be at least tomorrow)
   // Use Europe/Istanbul timezone to determine "Today" and "Tomorrow"
   const now = new Date();
-  
+
   // Format dates as YYYY-MM-DD in Istanbul time
   const dateFormatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Istanbul",
@@ -398,13 +444,13 @@ export async function createReservation(
     // Calculate buffered times (30 mins before and after)
     const start = new Date(startTime);
     const end = new Date(endTime);
-    
+
     const bufferStart = new Date(start);
     bufferStart.setMinutes(bufferStart.getMinutes() - 30);
-    
+
     const bufferEnd = new Date(end);
     bufferEnd.setMinutes(bufferEnd.getMinutes() + 30);
-    
+
     const bufferStartTime = bufferStart.toISOString();
     const bufferEndTime = bufferEnd.toISOString();
 
@@ -438,7 +484,7 @@ export async function createReservation(
     }
   }
 
-  const isRecurring = recurrencePattern === "weekly";
+  const isRecurring = recurrencePattern !== undefined && recurrencePattern !== "none";
 
   // Insert main reservation
   // For recurring events, we no longer create child instances upfront.
@@ -458,6 +504,9 @@ export async function createReservation(
       catering_requested: cateringRequested ?? false,
       is_recurring: isRecurring,
       recurrence_pattern: recurrencePattern ?? "none",
+      recurrence_end_type: isRecurring ? (recurrenceEndType ?? "never") : null,
+      recurrence_count: isRecurring && recurrenceEndType === "count" ? recurrenceCount : null,
+      recurrence_end_date: isRecurring && recurrenceEndType === "date" ? recurrenceEndDate : null,
       parent_reservation_id: null,
     })
     .select("id")
@@ -500,18 +549,67 @@ export async function createReservation(
     });
   }
 
-  // Mock notification system: Log email notifications
-  if (status === "pending" || cateringRequested) {
-    const reasons = [];
-    if (status === "pending") reasons.push("requires approval");
-    if (cateringRequested) reasons.push("requests catering");
+  // Send catering notification email to Oylum when catering is requested
+  if (cateringRequested) {
+    const { sendCateringNotification } = await import("@/lib/email/send-catering-notification");
 
-    console.log(`[NOTIFICATION] Email sent to Oylum Çevik: New Request from ${userName} (${reasons.join(", ")})`);
-    console.log(`  - Title: ${title}`);
-    console.log(`  - Room: ${roomId}`);
+    const cateringResult = await sendCateringNotification({
+      reservation: {
+        id: reservation.id,
+        title,
+        description: description ?? undefined,
+        startTime,
+        endTime,
+        roomName: room.name,
+      },
+      requester: {
+        name: userName,
+        email: userProfile?.email || "",
+      },
+    });
+
+    if (cateringResult.success) {
+      console.log(`[CATERING] Notification email sent to Oylum for reservation ${reservation.id}`);
+    } else {
+      console.warn(`[CATERING] Failed to send notification email: ${cateringResult.error}`);
+    }
+  }
+
+  // Log notification for pending reservations
+  if (status === "pending") {
+    console.log(`[NOTIFICATION] Reservation pending approval: ${title} by ${userName}`);
+    console.log(`  - Room: ${room.name}`);
     console.log(`  - Time: ${startTime} - ${endTime}`);
     if (cateringRequested) console.log(`  - Catering: Requested`);
-    if (isRecurring) console.log(`  - Recurring: Weekly (repeats indefinitely)`);
+    if (isRecurring) console.log(`  - Recurring: ${recurrencePattern}`);
+
+    // Send email notification to admin team
+    const { sendReservationNotification } = await import("@/lib/email/send-reservation-notification");
+
+    const notificationResult = await sendReservationNotification({
+      notificationType: "pending",
+      reservation: {
+        id: reservation.id,
+        title,
+        description: description ?? undefined,
+        startTime,
+        endTime,
+        roomName: room.name,
+        cateringRequested: cateringRequested ?? false,
+        isRecurring,
+        recurrencePattern: recurrencePattern ?? "none",
+      },
+      requester: {
+        name: userName,
+        email: userProfile?.email || "",
+      },
+    });
+
+    if (notificationResult.success) {
+      console.log(`[NOTIFICATION] Email sent to admin team for pending reservation ${reservation.id}`);
+    } else {
+      console.warn(`[NOTIFICATION] Failed to send email notification: ${notificationResult.error}`);
+    }
   }
 
   // Send invitation emails to attendees only when the reservation is approved
@@ -556,16 +654,17 @@ export async function createReservation(
       // Use buffered times calculated earlier
       const start = new Date(startTime);
       const end = new Date(endTime);
-      
+
       const bufferStart = new Date(start);
       bufferStart.setMinutes(bufferStart.getMinutes() - 30);
-      
+
       const bufferEnd = new Date(end);
       bufferEnd.setMinutes(bufferEnd.getMinutes() + 30);
-      
+
       const blockStartTime = bufferStart.toISOString();
       const blockEndTime = bufferEnd.toISOString();
-      
+
+      // If the main event is recurring, blocks should also be recurring with same pattern
       const blockedReservations = otherRooms.map((otherRoom) => ({
         room_id: otherRoom.id,
         user_id: user.id,
@@ -576,7 +675,12 @@ export async function createReservation(
         status: "approved" as const,
         tags: ["big_event_block"],
         catering_requested: false,
-        is_recurring: false,
+        is_recurring: isRecurring,
+        recurrence_pattern: isRecurring ? (recurrencePattern ?? "none") : "none",
+        recurrence_end_type: isRecurring ? (recurrenceEndType ?? "never") : null,
+        recurrence_count: isRecurring && recurrenceEndType === "count" ? recurrenceCount : null,
+        recurrence_end_date: isRecurring && recurrenceEndType === "date" ? recurrenceEndDate : null,
+        parent_reservation_id: null,
       }));
 
       const { error: blockInsertError } = await supabase
@@ -678,6 +782,7 @@ export async function updateReservationStatus(
       catering_requested,
       attendees,
       is_recurring,
+      recurrence_pattern,
       rooms (
         name
       ),
@@ -766,6 +871,34 @@ export async function updateReservationStatus(
       if (failed.length > 0) {
         console.warn(`[INVITATION] Failed to send ${failed.length} invitation(s)`);
       }
+    }
+
+    // Send email notification to admin team about approval
+    const { sendReservationNotification } = await import("@/lib/email/send-reservation-notification");
+
+    const notificationResult = await sendReservationNotification({
+      notificationType: "approved",
+      reservation: {
+        id: reservation.id,
+        title: reservation.title,
+        description: reservation.description ?? undefined,
+        startTime: reservation.start_time,
+        endTime: reservation.end_time,
+        roomName,
+        cateringRequested: reservation.catering_requested ?? false,
+        isRecurring: reservation.is_recurring,
+        recurrencePattern: (reservation as { recurrence_pattern?: string }).recurrence_pattern ?? "none",
+      },
+      requester: {
+        name: requesterName,
+        email: requesterProfile?.email || "",
+      },
+    });
+
+    if (notificationResult.success) {
+      console.log(`[NOTIFICATION] Approval email sent to admin team for reservation ${reservation.id}`);
+    } else {
+      console.warn(`[NOTIFICATION] Failed to send approval email notification: ${notificationResult.error}`);
     }
   }
 
@@ -1014,7 +1147,7 @@ export async function cancelReservation(
   // --- BIG EVENT CASCADE CANCELLATION LOG ---
   // If this was a Big Event (which blocked all other rooms), cancel those blocks
   const isBigEvent = isBigEventRequest(reservation.tags ?? []);
-  
+
   if (isBigEvent) {
     console.log("Cancelling Big Event blocks...");
     // Find all placeholder blocks created by this event
@@ -1023,19 +1156,19 @@ export async function cancelReservation(
     // 2. BUFFERED time slot (30 mins before/after)
     // 3. Created by the same user (usually)
     // 4. Active status
-    
+
     const start = new Date(reservation.start_time);
     const end = new Date(reservation.end_time);
-    
+
     const bufferStart = new Date(start);
     bufferStart.setMinutes(bufferStart.getMinutes() - 30);
-    
+
     const bufferEnd = new Date(end);
     bufferEnd.setMinutes(bufferEnd.getMinutes() + 30);
-    
+
     const bufferStartTime = bufferStart.toISOString();
     const bufferEndTime = bufferEnd.toISOString();
-    
+
     const { data: blockedReservations } = await supabase
       .from("reservations")
       .select("id")
@@ -1046,7 +1179,7 @@ export async function cancelReservation(
 
     if (blockedReservations && blockedReservations.length > 0) {
       const blockIds = blockedReservations.map(r => r.id);
-      
+
       const { error: blockCancelError } = await supabase
         .from("reservations")
         .update({ status: "cancelled", updated_at: new Date().toISOString() })
@@ -1275,5 +1408,220 @@ export async function cancelRecurringInstance(
   return {
     success: true,
     message: "Seçilen tarih için rezervasyon başarıyla iptal edildi.",
+  };
+}
+
+// ===== UPDATE RESERVATION =====
+
+export type UpdateReservationInput = {
+  id: string;
+  title?: string;
+  description?: string;
+  startTime?: string;
+  endTime?: string;
+  roomId?: string;
+  attendees?: string[];
+  cateringRequested?: boolean;
+};
+
+export type UpdateReservationResult = {
+  success: boolean;
+  error?: string;
+};
+
+export async function updateReservation(
+  input: UpdateReservationInput
+): Promise<UpdateReservationResult> {
+  const { id, title, description, startTime, endTime, roomId, attendees, cateringRequested } = input;
+
+  if (!id) {
+    return { success: false, error: "Rezervasyon ID gereklidir." };
+  }
+
+  const supabase = await createClient();
+
+  // Get current user
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { success: false, error: "Bu işlem için giriş yapmanız gerekiyor." };
+  }
+
+  // Check if user is admin
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const isAdmin = profile?.role === "admin";
+
+  // Fetch the reservation
+  const { data: reservation, error: reservationError } = await supabase
+    .from("reservations")
+    .select("*, rooms(name)")
+    .eq("id", id)
+    .single();
+
+  if (reservationError || !reservation) {
+    return { success: false, error: "Rezervasyon bulunamadı." };
+  }
+
+  // Check authorization: user must be owner or admin
+  if (reservation.user_id !== user.id && !isAdmin) {
+    return { success: false, error: "Bu rezervasyonu düzenleme yetkiniz yok." };
+  }
+
+  // Prevent editing past reservations
+  if (new Date(reservation.end_time) < new Date()) {
+    return { success: false, error: "Geçmiş rezervasyonlar düzenlenemez." };
+  }
+
+  // Only allow editing pending or approved reservations
+  if (!["pending", "approved"].includes(reservation.status)) {
+    return { success: false, error: "Bu durumda rezervasyon düzenlenemez." };
+  }
+
+  // If changing room, check room availability
+  const newStartTime = startTime || reservation.start_time;
+  const newEndTime = endTime || reservation.end_time;
+  const newRoomId = roomId || reservation.room_id;
+
+  if (roomId || startTime || endTime) {
+    // Check for conflicts (excluding this reservation)
+    const { data: conflicts } = await supabase
+      .from("reservations")
+      .select("id, title")
+      .eq("room_id", newRoomId)
+      .neq("id", id)
+      .in("status", ["pending", "approved"])
+      .lt("start_time", newEndTime)
+      .gt("end_time", newStartTime);
+
+    if (conflicts && conflicts.length > 0) {
+      return {
+        success: false,
+        error: `Bu zaman aralığında başka bir rezervasyon mevcut: ${conflicts[0].title}`,
+      };
+    }
+  }
+
+  // Build update object
+  const updateData: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (title !== undefined) updateData.title = title;
+  if (description !== undefined) updateData.description = description || null;
+  if (startTime !== undefined) updateData.start_time = startTime;
+  if (endTime !== undefined) updateData.end_time = endTime;
+  if (roomId !== undefined) updateData.room_id = roomId;
+  if (attendees !== undefined) updateData.attendees = attendees;
+  if (cateringRequested !== undefined) updateData.catering_requested = cateringRequested;
+
+  // Update the reservation
+  const { error: updateError } = await supabase
+    .from("reservations")
+    .update(updateData)
+    .eq("id", id);
+
+  if (updateError) {
+    console.error("Error updating reservation:", updateError);
+    return { success: false, error: "Rezervasyon güncellenirken bir hata oluştu." };
+  }
+
+  // Revalidate paths
+  revalidatePath("/");
+  revalidatePath("/reservations");
+  revalidatePath("/calendar");
+  revalidatePath("/admin/approvals");
+  revalidatePath("/admin/reservations");
+
+  return { success: true };
+}
+
+// ===== GET ALL ACTIVE RESERVATIONS (for admin) =====
+
+export type ActiveReservation = {
+  id: string;
+  title: string;
+  description: string | null;
+  start_time: string;
+  end_time: string;
+  status: string;
+  catering_requested: boolean;
+  is_recurring: boolean;
+  recurrence_pattern: string;
+  user_id: string;
+  rooms: { name: string };
+  profiles: { full_name: string | null; email: string };
+};
+
+export async function getActiveReservations(): Promise<{
+  success: boolean;
+  data?: ActiveReservation[];
+  error?: string;
+}> {
+  const supabase = await createClient();
+
+  // Get current user and check admin
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Giriş yapmanız gerekiyor." };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "admin") {
+    return { success: false, error: "Bu sayfaya erişim yetkiniz yok." };
+  }
+
+  // Get all active (pending, approved) reservations that are in the future
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("reservations")
+    .select(`
+      id,
+      title,
+      description,
+      start_time,
+      end_time,
+      status,
+      catering_requested,
+      is_recurring,
+      recurrence_pattern,
+      user_id,
+      rooms (name),
+      profiles (full_name, email)
+    `)
+    .in("status", ["pending", "approved"])
+    .is("parent_reservation_id", null)
+    .not("tags", "cs", '{"big_event_block"}')
+    .gte("end_time", now)
+    .order("start_time", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching active reservations:", error);
+    return { success: false, error: "Rezervasyonlar yüklenemedi." };
+  }
+
+  return {
+    success: true,
+    data: (data ?? []).map((r) => ({
+      ...r,
+      rooms: r.rooms as unknown as { name: string },
+      profiles: r.profiles as unknown as { full_name: string | null; email: string },
+    })) as ActiveReservation[],
   };
 }

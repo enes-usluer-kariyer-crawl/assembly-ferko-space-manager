@@ -11,10 +11,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Clock, MapPin, FileText, Coffee, Repeat, X, User } from "lucide-react";
+import { Clock, MapPin, FileText, Coffee, Repeat, X, User, Pencil } from "lucide-react";
 import { cancelReservation, cancelRecurringInstance } from "@/lib/actions/reservations";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { EditReservationDialog } from "@/components/reservations/EditReservationDialog";
 
 type ReservationDetailDialogProps = {
   open: boolean;
@@ -42,6 +43,7 @@ type ReservationDetailDialogProps = {
   currentUserId?: string;
   isAdmin?: boolean;
   onCancelled?: () => void;
+  rooms?: { id: string; name: string }[];
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -91,6 +93,7 @@ export function ReservationDetailDialog({
   currentUserId,
   isAdmin = false,
   onCancelled,
+  rooms = [],
 }: ReservationDetailDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -290,18 +293,45 @@ export function ReservationDetailDialog({
             )}
           </div>
 
-          {/* Footer with Cancel Button */}
-          {canCancel && (
-            <DialogFooter className="pt-4 border-t">
-              <Button
-                variant="destructive"
-                onClick={handleCancelClick}
-                disabled={isLoading}
-                className="gap-2"
-              >
-                <X className="h-4 w-4" />
-                {isLoading ? "İptal ediliyor..." : cancelButtonLabel}
-              </Button>
+          {/* Footer with Actions */}
+          {(canCancel || isOwner || isAdmin) && (
+            <DialogFooter className="pt-4 border-t gap-2 sm:gap-0 sm:space-x-2">
+              {/* Edit Button - only for future non-cancelled/rejected events, and owner/admin */}
+              {(isOwner || isAdmin) && !isPastEvent && event.resource.status !== "cancelled" && event.resource.status !== "rejected" && (
+                <EditReservationDialog
+                  reservation={{
+                    id: realReservationId,
+                    title: event.title.replace(` (${event.resource.roomName})`, ""),
+                    description: event.resource.description,
+                    start_time: event.start.toISOString(),
+                    end_time: event.end.toISOString(),
+                    room_id: event.resource.roomId,
+                    attendees: [],
+                    catering_requested: event.resource.cateringRequested,
+                  }}
+                  rooms={rooms}
+                  trigger={
+                    <Button variant="outline" className="gap-2">
+                      <Pencil className="h-4 w-4" />
+                      Düzenle
+                    </Button>
+                  }
+                  onSuccess={() => onOpenChange(false)}
+                />
+              )}
+
+              {/* Cancel Button */}
+              {canCancel && (
+                <Button
+                  variant="destructive"
+                  onClick={handleCancelClick}
+                  disabled={isLoading}
+                  className="gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  {isLoading ? "İptal ediliyor..." : cancelButtonLabel}
+                </Button>
+              )}
             </DialogFooter>
           )}
         </DialogContent>

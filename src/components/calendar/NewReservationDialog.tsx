@@ -99,7 +99,11 @@ export function NewReservationDialog({
   const [endTime, setEndTime] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [cateringRequested, setCateringRequested] = useState(false);
-  const [recurrencePattern, setRecurrencePattern] = useState<"none" | "weekly">("none");
+  // Recurrence state - Outlook style
+  const [recurrencePattern, setRecurrencePattern] = useState<"none" | "daily" | "weekly" | "biweekly" | "monthly">("none");
+  const [recurrenceEndType, setRecurrenceEndType] = useState<"never" | "count" | "date">("never");
+  const [recurrenceCount, setRecurrenceCount] = useState(4); // Default 4 occurrences
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
   const [attendees, setAttendees] = useState<string[]>([]);
   const [attendeeInput, setAttendeeInput] = useState("");
   const [attendeeError, setAttendeeError] = useState<string | null>(null);
@@ -124,6 +128,9 @@ export function NewReservationDialog({
       setSelectedTags([]);
       setCateringRequested(false);
       setRecurrencePattern("none");
+      setRecurrenceEndType("never");
+      setRecurrenceCount(4);
+      setRecurrenceEndDate("");
       setAttendees([]);
       setAttendeeInput("");
       setAttendeeError(null);
@@ -206,10 +213,11 @@ export function NewReservationDialog({
   };
 
   const handleTagToggle = (tag: string) => {
+    // Sadece bir büyük etkinlik etiketi seçilebilir
     setSelectedTags((prev) =>
       prev.includes(tag)
-        ? prev.filter((t) => t !== tag)
-        : [...prev, tag]
+        ? [] // Aynı etikete tıklanırsa seçimi kaldır
+        : [tag] // Farklı etikete tıklanırsa sadece onu seç
     );
   };
 
@@ -297,6 +305,9 @@ export function NewReservationDialog({
         tags: selectedTags,
         cateringRequested,
         recurrencePattern,
+        recurrenceEndType,
+        recurrenceCount: recurrenceEndType === "count" ? recurrenceCount : undefined,
+        recurrenceEndDate: recurrenceEndType === "date" ? recurrenceEndDate : undefined,
         attendees: attendees.length > 0 ? attendees : undefined,
       });
 
@@ -404,6 +415,43 @@ export function NewReservationDialog({
               />
             </div>
 
+            {/* Tags single-select (for big events) - moved here after title */}
+            <div className="space-y-2">
+              <Label>Etiketler (Büyük Etkinlikler)</Label>
+              <div className="flex flex-col space-y-2 rounded-md border p-3">
+                {BIG_EVENT_TAGS.map((tag) => (
+                  <div key={tag} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      id={`tag-${tag}`}
+                      name="big-event-tag"
+                      checked={selectedTags.includes(tag)}
+                      onChange={() => handleTagToggle(tag)}
+                      className="h-4 w-4 text-primary border-gray-300 focus:ring-primary"
+                    />
+                    <Label
+                      htmlFor={`tag-${tag}`}
+                      className="font-normal cursor-pointer"
+                    >
+                      {tag}
+                    </Label>
+                  </div>
+                ))}
+                {selectedTags.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTags([])}
+                    className="text-xs text-muted-foreground hover:text-destructive underline self-start mt-1"
+                  >
+                    Seçimi Kaldır
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Büyük etkinlikler tüm odaları bloke eder. Yalnızca bir etiket seçilebilir.
+              </p>
+            </div>
+
             {/* Room selection */}
             <div className="space-y-2">
               <Label htmlFor="room">Oda *</Label>
@@ -488,47 +536,108 @@ export function NewReservationDialog({
               Hazırlık süreçleri nedeniyle en erken yarına rezervasyon oluşturabilirsiniz.
             </p>
 
-            {/* Tags multi-select (for big events) */}
-            <div className="space-y-2">
-              <Label>Etiketler (Büyük Etkinlikler)</Label>
-              <div className="flex flex-row space-x-4 rounded-md border p-3">
-                {BIG_EVENT_TAGS.map((tag) => (
-                  <div key={tag} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`tag-${tag}`}
-                      checked={selectedTags.includes(tag)}
-                      onCheckedChange={() => handleTagToggle(tag)}
-                    />
-                    <Label
-                      htmlFor={`tag-${tag}`}
-                      className="font-normal cursor-pointer"
-                    >
-                      {tag}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Büyük etkinlikler tüm odaları bloke eder.
-              </p>
-            </div>
 
-            {/* Recurrence */}
-            <div className="space-y-2">
+            {/* Recurrence - Outlook Style */}
+            <div className="space-y-3">
               <Label htmlFor="recurrence">Tekrarla</Label>
-              <Select value={recurrencePattern} onValueChange={(value: "none" | "weekly") => setRecurrencePattern(value)}>
+              <Select
+                value={recurrencePattern}
+                onValueChange={(value: "none" | "daily" | "weekly" | "biweekly" | "monthly") => {
+                  setRecurrencePattern(value);
+                  if (value === "none") {
+                    setRecurrenceEndType("never");
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Tekrar seçin" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Tekrarlanmıyor</SelectItem>
+                  <SelectItem value="daily">Her Gün</SelectItem>
                   <SelectItem value="weekly">Her Hafta</SelectItem>
+                  <SelectItem value="biweekly">İki Haftada Bir</SelectItem>
+                  <SelectItem value="monthly">Her Ay</SelectItem>
                 </SelectContent>
               </Select>
-              {recurrencePattern === "weekly" && (
-                <p className="text-xs text-muted-foreground">
-                  Bu rezervasyon 4 hafta boyunca her hafta aynı gün ve saatte tekrarlanacak.
-                </p>
+
+              {/* Recurrence End Options - shown only when recurrence is enabled */}
+              {recurrencePattern !== "none" && (
+                <div className="space-y-3 p-3 border rounded-md bg-muted/30">
+                  <Label className="text-sm font-medium">Bitiş Koşulu</Label>
+
+                  <div className="flex flex-col space-y-2">
+                    {/* Never */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        id="endType-never"
+                        name="recurrence-end"
+                        checked={recurrenceEndType === "never"}
+                        onChange={() => setRecurrenceEndType("never")}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="endType-never" className="font-normal cursor-pointer">
+                        Bitiş tarihi yok (süresiz)
+                      </Label>
+                    </div>
+
+                    {/* Count */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        id="endType-count"
+                        name="recurrence-end"
+                        checked={recurrenceEndType === "count"}
+                        onChange={() => setRecurrenceEndType("count")}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="endType-count" className="font-normal cursor-pointer">
+                        Tekrar sayısı:
+                      </Label>
+                      <Input
+                        type="number"
+                        min={2}
+                        max={52}
+                        value={recurrenceCount}
+                        onChange={(e) => setRecurrenceCount(Math.min(52, Math.max(2, parseInt(e.target.value) || 4)))}
+                        disabled={recurrenceEndType !== "count"}
+                        className="w-20 h-8"
+                      />
+                      <span className="text-sm text-muted-foreground">kez</span>
+                    </div>
+
+                    {/* Date */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        id="endType-date"
+                        name="recurrence-end"
+                        checked={recurrenceEndType === "date"}
+                        onChange={() => setRecurrenceEndType("date")}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="endType-date" className="font-normal cursor-pointer">
+                        Bitiş tarihi:
+                      </Label>
+                      <Input
+                        type="date"
+                        value={recurrenceEndDate}
+                        onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                        min={startDate}
+                        disabled={recurrenceEndType !== "date"}
+                        className="w-40 h-8"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {recurrencePattern === "daily" && "Her gün aynı saatte tekrarlanacak."}
+                    {recurrencePattern === "weekly" && "Her hafta aynı gün ve saatte tekrarlanacak."}
+                    {recurrencePattern === "biweekly" && "İki haftada bir aynı gün ve saatte tekrarlanacak."}
+                    {recurrencePattern === "monthly" && "Her ay aynı gün ve saatte tekrarlanacak."}
+                  </p>
+                </div>
               )}
             </div>
 

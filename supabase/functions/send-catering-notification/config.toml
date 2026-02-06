@@ -1,0 +1,2 @@
+[functions.send-catering-notification]
+verify_jwt = false

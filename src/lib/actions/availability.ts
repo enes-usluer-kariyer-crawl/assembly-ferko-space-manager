@@ -185,13 +185,16 @@ export async function checkAvailability({
   }
 
   // Logic 4: Check recurring events for conflicts
-  // Fetch all approved weekly recurring events for this room
+  // Logic 4: Check recurring events for conflicts
+  // Fetch all approved recurring events for this room
   const { data: recurringEvents, error: recurringError } = await supabase
     .from("reservations")
-    .select("id, title, start_time, end_time")
+    .select(`
+      id, title, start_time, end_time, recurrence_pattern, 
+      recurrence_end_type, recurrence_count, recurrence_end_date
+    `)
     .eq("room_id", roomId)
     .eq("is_recurring", true)
-    .eq("recurrence_pattern", "weekly")
     .in("status", ["pending", "approved"])
     .is("parent_reservation_id", null) // Only parent recurring events
     .neq("id", excludeReservationId ?? "00000000-0000-0000-0000-000000000000");
@@ -206,18 +209,67 @@ export async function checkAvailability({
       const eventStart = new Date(event.start_time);
       const eventEnd = new Date(event.end_time);
       const eventDuration = eventEnd.getTime() - eventStart.getTime();
+      const pattern = event.recurrence_pattern;
 
-      // Check if any recurring instance conflicts
-      // Generate instances from the original date up to 52 weeks in the future
-      for (let week = 0; week <= 52; week++) {
-        const instanceStart = new Date(eventStart);
-        instanceStart.setDate(instanceStart.getDate() + (week * 7));
+      const endType = event.recurrence_end_type;
+      const maxCount = event.recurrence_count || 1;
+      const recurrenceEndDate = event.recurrence_end_date ? new Date(event.recurrence_end_date) : null;
 
-        // Skip if this instance is before the requested time
-        if (instanceStart.getTime() + eventDuration <= requestedStart.getTime()) continue;
+      // If end type is date, normalize end date to end of day
+      if (recurrenceEndDate) {
+        recurrenceEndDate.setHours(23, 59, 59, 999);
+      }
 
-        // Stop if this instance is way after the requested time (no point checking further)
-        if (instanceStart.getTime() > requestedEnd.getTime() + 7 * 24 * 60 * 60 * 1000) break;
+      // Determine iteration limit based on pattern and end type
+      // For infinite ("never"), set reasonable limits based on pattern
+      const maxIterations =
+        endType === "count" ? maxCount :
+          pattern === "daily" ? 365 :
+            pattern === "monthly" ? 24 :
+              52; // weekly/biweekly default
+
+      // Helper for next occurrence
+      const getNextOccurrence = (baseDate: Date, occurrence: number): Date => {
+        const nextDate = new Date(baseDate);
+        switch (pattern) {
+          case "daily":
+            nextDate.setDate(nextDate.getDate() + occurrence);
+            break;
+          case "weekly":
+            nextDate.setDate(nextDate.getDate() + (occurrence * 7));
+            break;
+          case "biweekly":
+            nextDate.setDate(nextDate.getDate() + (occurrence * 14));
+            break;
+          case "monthly":
+            nextDate.setMonth(nextDate.getMonth() + occurrence);
+            break;
+        }
+        return nextDate;
+      };
+
+      // Check instances
+      for (let i = 0; i <= maxIterations; i++) {
+        // i=0 is the original event (already checked by Logic 1 if overlapping view range, 
+        // but we check again here relative to recurrences logic)
+
+        const instanceStart = i === 0 ? eventStart : getNextOccurrence(eventStart, i);
+
+        // Stop if passed end date check
+        if (endType === "date" && recurrenceEndDate && instanceStart > recurrenceEndDate) {
+          break;
+        }
+
+        // Optimization: Stop if instance is way past requested time
+        // Give some buffer (e.g. 1 day)
+        if (instanceStart.getTime() > requestedEnd.getTime() + 24 * 60 * 60 * 1000) {
+          break;
+        }
+
+        // Skip if this instance ends before requested start
+        if (instanceStart.getTime() + eventDuration <= requestedStart.getTime()) {
+          continue;
+        }
 
         const instanceEnd = new Date(instanceStart.getTime() + eventDuration);
 

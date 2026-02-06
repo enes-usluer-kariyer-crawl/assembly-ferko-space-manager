@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, Shield, User, LogOut, LogIn, BarChart3 } from "lucide-react";
+import { Home, CalendarDays, Shield, User, LogOut, LogIn, BarChart3, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -33,9 +33,9 @@ const navItems = [
 
 const adminItems = [
   {
-    label: "Yönetim Paneli",
-    href: "/admin/approvals",
-    icon: Shield,
+    label: "Rezervasyon Yönetimi",
+    href: "/admin/reservations",
+    icon: CalendarClock,
   },
   {
     label: "Raporlar",
