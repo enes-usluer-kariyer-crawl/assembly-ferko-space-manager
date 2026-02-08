@@ -96,8 +96,21 @@ function formatDateTurkish(dateStr: string): string {
   });
 }
 
+function unescapeHTML(str?: string) {
+  if (!str) return "";
+  return str
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 function generateEmailHTML(params: InvitationRequest): string {
   const { reservation, organizer } = params;
+
+  // Ensure description is treated as HTML, not text
+  const descriptionHtml = unescapeHTML(reservation.description);
 
   return `<!DOCTYPE html>
 <html lang="tr">
@@ -131,10 +144,10 @@ function generateEmailHTML(params: InvitationRequest): string {
           <td style="padding: 8px 0; color: #6b7280;">Bitis:</td>
           <td style="padding: 8px 0; font-weight: 500;">${formatDateTurkish(reservation.endTime)}</td>
         </tr>
-        ${reservation.description ? `
+        ${descriptionHtml ? `
         <tr>
           <td style="padding: 8px 0; color: #6b7280; vertical-align: top;">Aciklama:</td>
-          <td style="padding: 8px 0;">${reservation.description}</td>
+          <td style="padding: 8px 0;">${descriptionHtml}</td>
         </tr>
         ` : ""}
       </table>

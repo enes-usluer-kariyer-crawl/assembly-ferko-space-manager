@@ -250,10 +250,10 @@ export function NewReservationDialog({
     // Validate form
     const formTitle = formData.get("title") as string;
     const formRoomId = formData.get("roomId") as string;
-    const formStartDate = formData.get("startDate") as string;
-    const formStartTime = formData.get("startTime") as string;
-    const formEndDate = formData.get("endDate") as string;
-    const formEndTime = formData.get("endTime") as string;
+    const formStartDate = (formData.get("startDate") as string) || startDate;
+    const formStartTime = (formData.get("startTime") as string) || startTime;
+    const formEndDate = (formData.get("endDate") as string) || endDate;
+    const formEndTime = (formData.get("endTime") as string) || endTime;
     if (!formTitle?.trim()) {
       setError("Lütfen bir başlık girin.");
       return;

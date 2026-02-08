@@ -4,6 +4,8 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 import { useCallback, useEffect, useRef } from "react";
 import {
   Bold,
@@ -72,7 +74,10 @@ export function RichTextEditor({
       }),
       Image.configure({
         inline: false,
-        HTMLAttributes: { class: "max-w-full rounded-md" },
+        HTMLAttributes: {
+          class: "max-w-full rounded-md",
+          style: "max-width: 100%; height: auto; display: block; margin: 10px 0;"
+        },
       }),
     ],
     content: value || "",
@@ -105,12 +110,33 @@ export function RichTextEditor({
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result as string;
-        editor.chain().focus().setImage({ src: base64 }).run();
-      };
-      reader.readAsDataURL(file);
+      const toastId = toast.loading("Görsel yükleniyor...");
+
+      try {
+        const supabase = createClient();
+        // Create unique filename
+        const fileExt = file.name.split(".").pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `reservations/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("img")
+          .upload(filePath, file);
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("img")
+          .getPublicUrl(filePath);
+
+        editor.chain().focus().setImage({ src: publicUrl }).run();
+        toast.success("Görsel eklendi", { id: toastId });
+      } catch (error) {
+        console.error("Image upload failed", error);
+        toast.error("Görsel yüklenirken hata oluştu", { id: toastId });
+      }
     };
     input.click();
   }, [editor]);

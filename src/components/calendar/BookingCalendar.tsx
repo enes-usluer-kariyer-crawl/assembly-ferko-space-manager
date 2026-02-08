@@ -119,11 +119,11 @@ function EventComponent({ event }: { event: CalendarEvent }) {
 }
 
 const ROOM_COLORS: Record<string, { dot: string; activeBg: string; activeRing: string }> = {
-  'Büyük Oda':    { dot: 'bg-blue-600',    activeBg: 'bg-blue-100 dark:bg-blue-900/30',      activeRing: 'ring-2 ring-blue-600' },
-  'Demo Odası':   { dot: 'bg-amber-500',   activeBg: 'bg-orange-100 dark:bg-orange-900/30',   activeRing: 'ring-2 ring-orange-500' },
+  'Büyük Oda': { dot: 'bg-blue-600', activeBg: 'bg-blue-100 dark:bg-blue-900/30', activeRing: 'ring-2 ring-blue-600' },
+  'Demo Odası': { dot: 'bg-amber-500', activeBg: 'bg-orange-100 dark:bg-orange-900/30', activeRing: 'ring-2 ring-orange-500' },
   'Eğitim Odası': { dot: 'bg-emerald-600', activeBg: 'bg-emerald-100 dark:bg-emerald-900/30', activeRing: 'ring-2 ring-emerald-600' },
-  'Koltuklu Oda': { dot: 'bg-purple-600',  activeBg: 'bg-purple-100 dark:bg-purple-900/30',   activeRing: 'ring-2 ring-purple-600' },
-  'Masalı Oda':   { dot: 'bg-rose-600',    activeBg: 'bg-rose-100 dark:bg-rose-900/30',       activeRing: 'ring-2 ring-rose-600' },
+  'Koltuklu Oda': { dot: 'bg-purple-600', activeBg: 'bg-purple-100 dark:bg-purple-900/30', activeRing: 'ring-2 ring-purple-600' },
+  'Masalı Oda': { dot: 'bg-rose-600', activeBg: 'bg-rose-100 dark:bg-rose-900/30', activeRing: 'ring-2 ring-rose-600' },
 };
 
 const DEFAULT_ROOM_COLOR = { dot: 'bg-gray-500', activeBg: 'bg-gray-100 dark:bg-gray-900/30', activeRing: 'ring-2 ring-gray-500' };
@@ -269,30 +269,34 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
         break;
     }
 
+    const isPast = event.end < new Date();
+    const commonStyle = {
+      backgroundColor,
+      color: 'white',
+      borderRadius: '6px',
+      zIndex: 10,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+      // Past events are faded and grayscale
+      opacity: isPast ? 0.4 : 1,
+      filter: isPast ? 'grayscale(0.6)' : 'none',
+    };
+
     // Handle "Pending" status visual (e.g., striped or lighter opacity)
     if (event.resource.status === 'pending') {
       return {
         style: {
-          backgroundColor: backgroundColor,
-          opacity: 0.7,
+          ...commonStyle,
+          opacity: isPast ? 0.3 : 0.7,
           border: '2px dashed #fff',
-          color: 'white',
-          borderRadius: '6px',
-          zIndex: 10,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
         }
       };
     }
 
-    // Main events: high zIndex and shadow to float above striped background
+    // Main events
     return {
       style: {
-        backgroundColor,
-        color: 'white',
-        borderRadius: '6px',
+        ...commonStyle,
         border: 'none',
-        zIndex: 10,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
       }
     };
   }, []);
@@ -417,9 +421,8 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setSelectedRoomFilter(isSelected ? null : room.name)}
-                    className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${
-                      isSelected ? `${colors.activeBg} ${colors.activeRing}` : 'hover:bg-muted'
-                    }`}
+                    className={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${isSelected ? `${colors.activeBg} ${colors.activeRing}` : 'hover:bg-muted'
+                      }`}
                   >
                     <div className={`w-3 h-3 rounded ${colors.dot}`}></div>
                     <span className={`text-sm ${isSelected ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
