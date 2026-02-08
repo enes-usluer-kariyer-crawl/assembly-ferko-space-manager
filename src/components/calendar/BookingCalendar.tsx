@@ -19,6 +19,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, Coffee, Repeat } from "lucide-react";
 
 const locales = {
@@ -157,11 +164,21 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
     setReservations(initialReservations);
   }, [initialReservations]);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null);
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => {
+    const now = new Date();
+    const day = now.getDay();
+    // If weekend (Sunday=0, Saturday=6), default to next Monday to show upcoming week
+    if (day === 0 || day === 6) {
+      const nextMonday = new Date(now);
+      nextMonday.setDate(now.getDate() + (day === 0 ? 1 : 2));
+      return nextMonday;
+    }
+    return now;
+  });
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedRoomFilter, setSelectedRoomFilter] = useState<string | null>(null);
-  const [view, setView] = useState<View>(Views.WEEK);
+  const [view, setView] = useState<View>(Views.WORK_WEEK);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -403,6 +420,25 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           </Button>
         </div>
 
+        {/* View Mode Select */}
+        <div className="flex justify-end mb-4 px-1">
+          <Select
+            value={view === Views.WORK_WEEK ? "work_week" : (view === Views.WEEK ? "week" : "")}
+            onValueChange={(val) => {
+              if (val === "work_week") handleViewChange(Views.WORK_WEEK);
+              if (val === "week") handleViewChange(Views.WEEK);
+            }}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Görünüm Seçiniz" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="work_week">İş Günü (Pzt-Cum)</SelectItem>
+              <SelectItem value="week">Tüm Hafta (Pzt-Paz)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Legend - clickable for filtering */}
         <div className="flex flex-wrap gap-4 mb-4 px-1 items-center">
           {selectedRoomFilter && (
@@ -470,9 +506,9 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
               onNavigate={handleNavigate}
               view={view}
               onView={handleViewChange}
-              views={[Views.MONTH, Views.WEEK, Views.DAY]}
+              views={[Views.MONTH, Views.WEEK, Views.WORK_WEEK, Views.DAY]}
               selectable
-              scrollToTime={new Date()}
+              scrollToTime={new Date(1970, 0, 1, 7)}
               onSelectSlot={handleSelectSlot}
               onSelectEvent={handleSelectEvent}
               eventPropGetter={eventStyleGetter}
