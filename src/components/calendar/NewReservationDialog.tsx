@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { EmailAutocomplete } from "@/components/ui/email-autocomplete";
 
 import { createReservation, type Room, type ConflictingReservation } from "@/lib/actions/reservations";
 import { BIG_EVENT_TAGS } from "@/constants/events";
@@ -639,12 +640,20 @@ export function NewReservationDialog({
             <div className="space-y-2">
               <Label>Katılımcılar</Label>
               <div className="flex gap-2">
-                <Input
-                  type="email"
-                  placeholder="ornek@email.com"
+                <EmailAutocomplete
                   value={attendeeInput}
-                  onChange={(e) => {
-                    setAttendeeInput(e.target.value);
+                  onChange={(val) => {
+                    setAttendeeInput(val);
+                    setAttendeeError(null);
+                  }}
+                  onSelect={(email) => {
+                    const normalized = email.trim().toLowerCase();
+                    if (attendees.includes(normalized)) {
+                      setAttendeeError("Bu email zaten eklenmiş");
+                      return;
+                    }
+                    setAttendees([...attendees, normalized]);
+                    setAttendeeInput("");
                     setAttendeeError(null);
                   }}
                   onKeyDown={(e) => {
@@ -653,7 +662,9 @@ export function NewReservationDialog({
                       addAttendee();
                     }
                   }}
+                  placeholder="ornek@email.com"
                   className={attendeeError ? "border-destructive" : ""}
+                  excludeEmails={attendees}
                 />
                 <Button
                   type="button"

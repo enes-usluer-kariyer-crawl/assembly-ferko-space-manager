@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { Pencil, Plus, X, Mail } from "lucide-react";
@@ -27,6 +27,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { EmailAutocomplete } from "@/components/ui/email-autocomplete";
 
 import { updateReservation, type Room } from "@/lib/actions/reservations";
 import { BIG_EVENT_TAGS } from "@/constants/events";
@@ -491,16 +492,23 @@ export function EditReservationDialog({
                         )}
                     </div>
 
-                    {/* Attorneys */}
                     <div className="space-y-2">
                         <Label>Katılımcılar</Label>
                         <div className="flex gap-2">
-                            <Input
-                                type="email"
-                                placeholder="ornek@email.com"
+                            <EmailAutocomplete
                                 value={attendeeInput}
-                                onChange={(e) => {
-                                    setAttendeeInput(e.target.value);
+                                onChange={(val) => {
+                                    setAttendeeInput(val);
+                                    setAttendeeError(null);
+                                }}
+                                onSelect={(email) => {
+                                    const normalized = email.trim().toLowerCase();
+                                    if (attendees.includes(normalized)) {
+                                        setAttendeeError("Bu email zaten eklenmiş");
+                                        return;
+                                    }
+                                    setAttendees([...attendees, normalized]);
+                                    setAttendeeInput("");
                                     setAttendeeError(null);
                                 }}
                                 onKeyDown={(e) => {
@@ -509,7 +517,9 @@ export function EditReservationDialog({
                                         addAttendee();
                                     }
                                 }}
+                                placeholder="ornek@email.com"
                                 className={attendeeError ? "border-destructive" : ""}
+                                excludeEmails={attendees}
                             />
                             <Button type="button" variant="outline" size="icon" onClick={addAttendee}>
                                 <Plus className="h-4 w-4" />

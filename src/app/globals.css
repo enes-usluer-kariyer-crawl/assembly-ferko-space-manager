@@ -167,6 +167,7 @@
 
 .rbc-time-content {
   @apply border-t-0;
+  overflow-y: auto !important;
 }
 
 .rbc-time-content > * + * > * {

@@ -185,6 +185,45 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
     setIsMounted(true);
   }, []);
 
+  // Scroll calendar to 07:00 on mount and view change
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const scrollToSevenAM = () => {
+      // Try multiple possible scrollable containers
+      const selectors = [
+        '.rbc-time-content',
+        '.rbc-time-view',
+        '.rbc-time-view > .rbc-time-content',
+      ];
+
+      for (const selector of selectors) {
+        const el = document.querySelector(selector) as HTMLElement;
+        if (el && el.scrollHeight > el.clientHeight) {
+          // Calculate scroll position: each hour = scrollHeight / 24
+          const hourHeight = el.scrollHeight / 24;
+          const targetScroll = hourHeight * 7; // 07:00
+          el.scrollTop = targetScroll;
+          console.log(`Scrolled ${selector} to ${targetScroll}px (scrollHeight: ${el.scrollHeight})`);
+          break;
+        }
+      }
+    };
+
+    // Try multiple times to ensure DOM is ready
+    const timer1 = setTimeout(scrollToSevenAM, 100);
+    const timer2 = setTimeout(scrollToSevenAM, 300);
+    const timer3 = setTimeout(scrollToSevenAM, 600);
+    const timer4 = setTimeout(scrollToSevenAM, 1000);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+      clearTimeout(timer4);
+    };
+  }, [isMounted, view, currentDate]);
+
   // Convert reservations to calendar events
   const allEvents: CalendarEvent[] = useMemo(() => {
     return reservations.map((reservation) => {
@@ -399,6 +438,26 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
   // Expose updateReservations for parent components
   (BookingCalendar as typeof BookingCalendar & { updateReservations?: typeof updateReservations }).updateReservations = updateReservations;
 
+  // Memoize time constants to prevent re-renders and ensure correct scrolling
+  // Using 'new Date()' (today) instead of 1970/1972 ensures better compatibility
+  const { min, max, scrollToTime } = useMemo(() => {
+    const today = new Date();
+    const minTime = new Date(today);
+    minTime.setHours(0, 0, 0, 0);  // Start from 00:00, scroll will position to 07:00
+
+    const maxTime = new Date(today);
+    maxTime.setHours(23, 59, 59, 999);
+
+    const scrollTime = new Date(today);
+    scrollTime.setHours(7, 0, 0, 0);
+
+    return {
+      min: minTime,
+      max: maxTime,
+      scrollToTime: scrollTime
+    };
+  }, []);
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className="h-full flex flex-col">
@@ -508,13 +567,13 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
               onView={handleViewChange}
               views={[Views.MONTH, Views.WEEK, Views.WORK_WEEK, Views.DAY]}
               selectable
-              scrollToTime={new Date(1970, 0, 1, 7)}
+              scrollToTime={scrollToTime}
               onSelectSlot={handleSelectSlot}
               onSelectEvent={handleSelectEvent}
               eventPropGetter={eventStyleGetter}
               slotPropGetter={slotPropGetter}
-              min={new Date(0, 0, 0, 0, 0, 0)}
-              max={new Date(0, 0, 0, 23, 59, 59)}
+              min={min}
+              max={max}
               step={30}
               timeslots={2}
               culture="tr"
