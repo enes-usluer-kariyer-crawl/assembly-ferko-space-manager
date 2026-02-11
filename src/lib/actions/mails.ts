@@ -2,17 +2,23 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-export async function searchMails(query: string): Promise<string[]> {
+export type MailSearchResult = {
+    mail: string;
+    name: string | null;
+};
+
+export async function searchMails(query: string): Promise<MailSearchResult[]> {
     if (!query || query.trim().length < 1) {
         return [];
     }
 
     const supabase = await createClient();
+    const trimmedQuery = query.trim();
 
     const { data, error } = await supabase
         .from("mails")
-        .select("mail")
-        .ilike("mail", `%${query.trim()}%`)
+        .select("mail, name")
+        .or(`mail.ilike.%${trimmedQuery}%,name.ilike.%${trimmedQuery}%`)
         .order("mail", { ascending: true })
         .limit(10);
 
@@ -21,5 +27,8 @@ export async function searchMails(query: string): Promise<string[]> {
         return [];
     }
 
-    return (data ?? []).map((row) => row.mail);
+    return (data ?? []).map((row) => ({
+        mail: row.mail,
+        name: row.name
+    }));
 }

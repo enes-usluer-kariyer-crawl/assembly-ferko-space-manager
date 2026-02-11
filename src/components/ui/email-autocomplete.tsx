@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Input } from "@/components/ui/input";
-import { searchMails } from "@/lib/actions/mails";
+import { searchMails, MailSearchResult } from "@/lib/actions/mails";
 import { Mail, Loader2 } from "lucide-react";
 
 type EmailAutocompleteProps = {
@@ -25,7 +25,7 @@ export function EmailAutocomplete({
     className,
     excludeEmails = [],
 }: EmailAutocompleteProps) {
-    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [suggestions, setSuggestions] = useState<MailSearchResult[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -46,7 +46,7 @@ export function EmailAutocomplete({
                 const results = await searchMails(query);
                 // Filter out already-added emails
                 const filtered = results.filter(
-                    (email) => !excludeEmails.includes(email.toLowerCase())
+                    (item) => !excludeEmails.includes(item.mail.toLowerCase())
                 );
                 setSuggestions(filtered);
                 if (filtered.length > 0) {
@@ -117,7 +117,7 @@ export function EmailAutocomplete({
             if (e.key === "Enter" && highlightedIndex >= 0) {
                 e.preventDefault();
                 e.stopPropagation();
-                handleSelect(suggestions[highlightedIndex]);
+                handleSelect(suggestions[highlightedIndex].mail);
                 return;
             }
 
@@ -133,22 +133,24 @@ export function EmailAutocomplete({
     };
 
     // Highlight matching text in suggestions
-    const highlightMatch = (email: string, query: string) => {
-        const lowerEmail = email.toLowerCase();
+    const highlightMatch = (text: string, query: string) => {
+        if (!text) return null;
+
+        const lowerText = text.toLowerCase();
         const lowerQuery = query.toLowerCase().trim();
-        const index = lowerEmail.indexOf(lowerQuery);
+        const index = lowerText.indexOf(lowerQuery);
 
         if (index === -1 || !lowerQuery) {
-            return <span>{email}</span>;
+            return <span>{text}</span>;
         }
 
         return (
             <span>
-                {email.slice(0, index)}
+                {text.slice(0, index)}
                 <span className="font-semibold text-primary">
-                    {email.slice(index, index + lowerQuery.length)}
+                    {text.slice(index, index + lowerQuery.length)}
                 </span>
-                {email.slice(index + lowerQuery.length)}
+                {text.slice(index + lowerQuery.length)}
             </span>
         );
     };
@@ -185,21 +187,28 @@ export function EmailAutocomplete({
                 <div
                     className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-y-auto"
                 >
-                    {suggestions.map((email, index) => (
+                    {suggestions.map((item, index) => (
                         <button
-                            key={email}
+                            key={item.mail}
                             type="button"
                             className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-accent hover:text-accent-foreground ${index === highlightedIndex
                                 ? "bg-accent text-accent-foreground"
                                 : ""
                                 }`}
-                            onClick={() => handleSelect(email)}
+                            onClick={() => handleSelect(item.mail)}
                             onMouseEnter={() => setHighlightedIndex(index)}
                         >
                             <Mail className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                            <span className="truncate">
-                                {highlightMatch(email, value)}
-                            </span>
+                            <div className="flex flex-col overflow-hidden">
+                                <span className="truncate">
+                                    {highlightMatch(item.mail, value)}
+                                </span>
+                                {item.name && (
+                                    <span className="text-xs text-muted-foreground truncate">
+                                        {highlightMatch(item.name, value)}
+                                    </span>
+                                )}
+                            </div>
                         </button>
                     ))}
                 </div>
