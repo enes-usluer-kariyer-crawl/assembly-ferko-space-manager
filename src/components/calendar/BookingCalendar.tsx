@@ -306,6 +306,41 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
     };
   }, [bigEventRanges]);
 
+  // Day style getter for month view (past days grayed out)
+  const dayPropGetter = useCallback((date: Date) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const currentMonth = currentDate.getMonth();
+
+    // Check if the date is in a different month than the currently viewed month
+    if (date.getMonth() !== currentMonth) {
+      return {
+        style: {
+          backgroundColor: '#fee2e2', // Red-100
+          opacity: 0.5,
+        }
+      };
+    }
+
+    // Check if the date is in the past (but within current month)
+    if (date < today) {
+      return {
+        style: {
+          // Stripe/Hatched pattern for past days
+          background: 'repeating-linear-gradient(45deg, #dbeafe, #dbeafe 10px, #bfdbfe 10px, #bfdbfe 20px)',
+          opacity: 0.5,
+        }
+      };
+    }
+
+    // Future days in current month (White background)
+    return {
+      style: {
+        backgroundColor: 'white',
+      }
+    };
+  }, [currentDate]);
+
   // Event style getter for color-coding by room
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
     let backgroundColor = '#3b82f6'; // Default Blue (Büyük Oda)
@@ -572,6 +607,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
               onSelectEvent={handleSelectEvent}
               eventPropGetter={eventStyleGetter}
               slotPropGetter={slotPropGetter}
+              dayPropGetter={dayPropGetter}
               min={min}
               max={max}
               step={30}
