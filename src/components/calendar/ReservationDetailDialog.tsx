@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Clock, MapPin, FileText, Coffee, Repeat, X, User, Pencil } from "lucide-react";
+import { Clock, MapPin, FileText, Coffee, Repeat, X, User, Pencil, UserCheck } from "lucide-react";
 import { cancelReservation, cancelRecurringInstance } from "@/lib/actions/reservations";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -40,6 +40,7 @@ type ReservationDetailDialogProps = {
       userName?: string;
       userFullName?: string | null;
       userEmail?: string;
+      approverEmail?: string;
     };
   } | null;
   currentUserId?: string;
@@ -250,6 +251,21 @@ export function ReservationDetailDialog({
                 )}
               </div>
             </div>
+
+            {/* Approver */}
+            {event.resource.status === 'approved' && event.resource.approverEmail && (
+              <div className="flex items-start gap-2">
+                <UserCheck className="h-4 w-4 mt-0.5 text-emerald-600" />
+                <div className="space-y-1">
+                  <span className="text-sm font-medium leading-none block text-emerald-700">
+                    Onaylayan
+                  </span>
+                  <span className="text-sm text-emerald-700 block">
+                    {event.resource.approverEmail}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Description */}
             {event.resource.description && (

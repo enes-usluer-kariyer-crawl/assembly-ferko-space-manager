@@ -48,6 +48,9 @@ export type Reservation = {
     full_name: string | null;
     email: string;
   } | null;
+  approver?: {
+    email: string;
+  } | null;
 };
 
 export type GetReservationsParams = {
@@ -90,8 +93,11 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
         id,
         name
       ),
-      profiles (
+      profiles!reservations_user_id_fkey (
         full_name,
+        email
+      ),
+      approver:profiles!reservations_approved_by_fkey (
         email
       )
     `
@@ -123,6 +129,7 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
     ...item,
     rooms: item.rooms as unknown as { id: string; name: string },
     profiles: item.profiles as unknown as { full_name: string | null; email: string } | null,
+    approver: item.approver as unknown as { email: string } | null,
   })) as Reservation[];
 
   // Expand recurring events to cover the view range
@@ -454,7 +461,7 @@ export async function createReservation(
     // We check the BUFFERED range to ensure the entire block period is clear
     const { data: existingBookings } = await supabase
       .from("reservations")
-      .select("id, title, room_id, start_time, end_time, rooms(name), profiles(full_name, email)")
+      .select("id, title, room_id, start_time, end_time, rooms(name), profiles!reservations_user_id_fkey(full_name, email)")
       .in("status", ["pending", "approved"])
       .not("tags", "cs", '{"big_event_block"}') // Exclude placeholder blocks
       .lt("start_time", bufferEndTime)
@@ -504,6 +511,7 @@ export async function createReservation(
       end_time: endTime,
       updated_at: new Date().toISOString(),
       status,
+      approved_by: status === "approved" ? user.id : null,
       tags: tags ?? [],
       attendees: finalAttendees,
       catering_requested: cateringRequested ?? false,
@@ -792,7 +800,7 @@ export async function updateReservationStatus(
       rooms (
         name
       ),
-      profiles (
+      profiles!reservations_user_id_fkey (
         full_name,
         email
       )
@@ -819,9 +827,20 @@ export async function updateReservationStatus(
   }
 
   // Update the reservation status
+  const updateData: { status: "approved" | "rejected"; updated_at: string; approved_by?: string | null } = {
+    status,
+    updated_at: new Date().toISOString()
+  };
+
+  if (status === "approved") {
+    updateData.approved_by = user.id;
+  } else {
+    updateData.approved_by = null;
+  }
+
   const { error: updateError } = await supabase
     .from("reservations")
-    .update({ status, updated_at: new Date().toISOString() })
+    .update(updateData)
     .eq("id", id);
 
   if (updateError) {
@@ -974,7 +993,7 @@ export async function getPendingReservations(): Promise<{
       rooms (
         name
       ),
-      profiles (
+      profiles!reservations_user_id_fkey (
         full_name,
         email
       )
@@ -1042,7 +1061,7 @@ export async function cancelReservation(
   // Fetch the reservation to get the owner and end_time
   const { data: reservation, error: reservationError } = await supabase
     .from("reservations")
-    .select("id, user_id, title, description, status, start_time, end_time, room_id, tags, attendees, rooms(name), profiles(full_name, email)")
+    .select("id, user_id, title, description, status, start_time, end_time, room_id, tags, attendees, rooms(name), profiles!reservations_user_id_fkey(full_name, email)")
     .eq("id", reservationId)
     .single();
 
@@ -1473,7 +1492,7 @@ export async function updateReservation(
   // Fetch the OLD reservation before update
   const { data: oldReservation, error: reservationError } = await supabase
     .from("reservations")
-    .select("*, rooms(name), profiles(full_name, email)")
+    .select("*, rooms(name), profiles!reservations_user_id_fkey(full_name, email)")
     .eq("id", id)
     .single();
 

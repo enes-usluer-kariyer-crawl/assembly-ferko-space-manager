@@ -154,7 +154,13 @@ serve(async (req) => {
         // Send email to all recipients
         const results = { sent: [] as string[], failed: [] as string[] };
 
-        for (const recipient of NOTIFICATION_RECIPIENTS) {
+        // Adminler ve onay durumunda talep eden kişiyi listeye ekle
+        const recipients = [...NOTIFICATION_RECIPIENTS];
+        if (notificationType === "approved" && requester.email && !recipients.includes(requester.email)) {
+            recipients.push(requester.email);
+        }
+
+        for (const recipient of recipients) {
             try {
                 await client.send({
                     from: SMTP_USERNAME,

@@ -58,6 +58,7 @@ type CalendarEvent = {
     userId?: string;
     userFullName?: string | null;
     userEmail?: string;
+    approverEmail?: string;
     blockedByEventName?: string;
   };
 };
@@ -98,6 +99,11 @@ function EventComponent({ event }: { event: CalendarEvent }) {
           {(event.resource.userEmail || event.resource.userFullName) && (
             <div className="text-sm">
               <span className="text-muted-foreground">Oluşturan:</span> {event.resource.userEmail || event.resource.userFullName}
+            </div>
+          )}
+          {event.resource.status === 'approved' && event.resource.approverEmail && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Onaylayan:</span> {event.resource.approverEmail}
             </div>
           )}
           {event.resource.description && (
@@ -249,6 +255,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           userId: reservation.user_id,
           userFullName: reservation.profiles?.full_name,
           userEmail: reservation.profiles?.email,
+          approverEmail: reservation.approver?.email,
           blockedByEventName: undefined // Would need to parse or fetch if needed
         },
       };
