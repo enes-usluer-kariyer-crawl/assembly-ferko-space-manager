@@ -1818,7 +1818,7 @@ export async function getActiveReservations(): Promise<{
       recurrence_pattern,
       user_id,
       rooms (name),
-      profiles (full_name, email)
+      profiles!reservations_user_id_fkey (full_name, email)
     `)
     .in("status", ["pending", "approved"])
     .is("parent_reservation_id", null)
