@@ -40,7 +40,7 @@ export async function getReportStats(filters: ReportFilters = {}): Promise<Repor
     .select(`
       *,
       room:rooms(id, name),
-      user:profiles(id, email, full_name)
+      user:profiles!reservations_user_id_fkey(id, email, full_name)
     `)
     .gte("start_time", start.toISOString())
     .lte("start_time", end.toISOString())
@@ -58,7 +58,7 @@ export async function getReportStats(filters: ReportFilters = {}): Promise<Repor
       .select(`
         *,
         room:rooms(id, name),
-        user:profiles(id, email, full_name)
+        user:profiles!reservations_user_id_fkey(id, email, full_name)
       `)
       .not("tags", "cs", '{"big_event_block"}')
       .order("updated_at", { ascending: false })
