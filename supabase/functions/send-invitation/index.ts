@@ -1,8 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import {
-  SMTPClient,
-  quotedPrintableEncode,
-} from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const SMTP_HOSTNAME = Deno.env.get("SMTP_HOSTNAME") || "smtp.gmail.com";
 const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "465");
@@ -112,6 +109,15 @@ function escapeHtml(value: string): string {
 function stripHtml(value?: string): string {
   if (!value) return "";
   return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function toBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
 }
 
 function generateEmailHTML(params: InvitationRequest): string {
@@ -270,30 +276,23 @@ serve(async (req) => {
       },
     });
 
-    // Send email with proper calendar attachment
     await client.send({
       from: SMTP_USERNAME,
       to: recipientEmail,
       subject: `Toplanti Daveti: ${subjectTitle}`,
-      mimeContent: [
-        {
-          mimeType: 'text/plain; charset="utf-8"',
-          content: quotedPrintableEncode(plainText),
-          transferEncoding: "quoted-printable",
-        },
-        {
-          mimeType: 'text/html; charset="utf-8"',
-          content: quotedPrintableEncode(emailHTML),
-          transferEncoding: "quoted-printable",
-        },
-      ],
+      text: plainText,
+      html: emailHTML,
       attachments: [
         {
           filename: "davet.ics",
-          content: new TextEncoder().encode(icsContent),
+          content: toBase64(icsContent),
           contentType: "text/calendar; charset=utf-8; method=REQUEST",
+          encoding: "base64",
         },
       ],
+      headers: {
+        "Content-Class": "urn:content-classes:calendarmessage",
+      },
     });
 
     await client.close();
