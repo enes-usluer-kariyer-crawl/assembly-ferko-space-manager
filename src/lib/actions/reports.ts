@@ -10,6 +10,7 @@ export type ReportStats = {
   approvedCount: number;
   byRoom: Record<string, { name: string; count: number; hours: number }>;
   byUser: Record<string, { email: string; name: string; count: number; hours: number }>;
+  byTeam: Record<string, { name: string; count: number; hours: number; totalDays: number }>;
   universityEventCount: number;
   companyEventCount: number;
   excoEventCount: number;
@@ -25,6 +26,12 @@ export type ReportFilters = {
 
 export async function getReportStats(filters: ReportFilters = {}): Promise<ReportStats> {
   const supabase = await createClient();
+  const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
 
   // Default to last 30 days if dates not provided
   let end = filters.endDate;
@@ -82,12 +89,14 @@ export async function getReportStats(filters: ReportFilters = {}): Promise<Repor
     approvedCount: 0,
     byRoom: {},
     byUser: {},
+    byTeam: {},
     universityEventCount: 0,
     companyEventCount: 0,
     excoEventCount: 0,
     recentActivity: recentLogs, // Use global recent logs
     allReservations: reservations, // Return all filtered for export
   };
+  const byTeamUniqueDaySet: Record<string, Set<string>> = {};
 
   reservations.forEach((res) => {
     // 1. General Counts
@@ -128,7 +137,20 @@ export async function getReportStats(filters: ReportFilters = {}): Promise<Repor
       stats.byUser[userId].count++;
       stats.byUser[userId].hours += durationHours;
 
-      // 4. Event Type Stats
+      // 4. Team Stats
+      const teamName = (res.team as string) || "Belirtilmedi";
+      if (!stats.byTeam[teamName]) {
+        stats.byTeam[teamName] = { name: teamName, count: 0, hours: 0, totalDays: 0 };
+      }
+      stats.byTeam[teamName].count++;
+      stats.byTeam[teamName].hours += durationHours;
+
+      if (!byTeamUniqueDaySet[teamName]) {
+        byTeamUniqueDaySet[teamName] = new Set<string>();
+      }
+      byTeamUniqueDaySet[teamName].add(dayKeyFormatter.format(new Date(res.start_time)));
+
+      // 5. Event Type Stats
       const tags = res.tags || [];
       if (tags.includes("Üniversite Etkinliği")) {
         stats.universityEventCount++;
@@ -138,6 +160,10 @@ export async function getReportStats(filters: ReportFilters = {}): Promise<Repor
         stats.companyEventCount++;
       }
     }
+  });
+
+  Object.keys(stats.byTeam).forEach((teamName) => {
+    stats.byTeam[teamName].totalDays = byTeamUniqueDaySet[teamName]?.size ?? 0;
   });
 
   return stats;

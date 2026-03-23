@@ -105,6 +105,7 @@ export default async function ReservationsPage() {
                           id: reservation.id,
                           title: reservation.title,
                           description: reservation.description,
+                          team: reservation.team,
                           start_time: reservation.start_time,
                           end_time: reservation.end_time,
                           room_id: reservation.rooms?.id || reservation.room_id,

@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import {
+    SMTPClient,
+    quotedPrintableEncode,
+} from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const SMTP_HOSTNAME = Deno.env.get("SMTP_HOSTNAME") || "smtp.gmail.com";
 const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "465");
@@ -40,6 +43,20 @@ function formatDateTurkish(dateStr: string): string {
         minute: "2-digit",
         timeZone: "Europe/Istanbul",
     });
+}
+
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function stripHtml(value?: string): string {
+    if (!value) return "";
+    return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function generateICS(event: {
@@ -98,22 +115,38 @@ function generateEmailHTML(params: CateringNotificationRequest): string {
     const { reservation, requester } = params;
     const startDate = formatDateTurkish(reservation.startTime);
     const endDate = formatDateTurkish(reservation.endTime);
-    const descriptionRow = reservation.description
-        ? `<tr><td style="padding:8px 0;color:#6b7280;vertical-align:top;">Aciklama:</td><td style="padding:8px 0;">${reservation.description}</td></tr>`
+    const safeTitle = escapeHtml(stripHtml(reservation.title));
+    const safeRoomName = escapeHtml(stripHtml(reservation.roomName));
+    const safeRequesterName = escapeHtml(stripHtml(requester.name));
+    const safeRequesterEmail = escapeHtml(stripHtml(requester.email));
+    const safeDescription = escapeHtml(stripHtml(reservation.description));
+    const descriptionRow = safeDescription
+        ? `<tr><td style="padding:8px 0;color:#6b7280;vertical-align:top;">Aciklama:</td><td style="padding:8px 0;white-space:pre-wrap;">${safeDescription}</td></tr>`
         : "";
 
-    return `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;"><div style="background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);padding:30px;border-radius:10px 10px 0 0;"><h1 style="color:white;margin:0;font-size:24px;">Rezervasyon Ikram Talebi</h1></div><div style="background:#f9fafb;padding:30px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;"><p style="margin-top:0;">Merhaba,</p><p><strong>${requester.name}</strong> tarafindan olusturulan bir toplanti icin <strong style="color:#d97706;">ikram talep edilmistir</strong>.</p><div style="background:white;padding:20px;border-radius:8px;border:1px solid #e5e7eb;margin:20px 0;"><h2 style="margin-top:0;color:#d97706;font-size:18px;">${reservation.title}</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#6b7280;width:120px;">Oda:</td><td style="padding:8px 0;font-weight:500;">${reservation.roomName}</td></tr><tr><td style="padding:8px 0;color:#6b7280;">Baslangic:</td><td style="padding:8px 0;font-weight:500;">${startDate}</td></tr><tr><td style="padding:8px 0;color:#6b7280;">Bitis:</td><td style="padding:8px 0;font-weight:500;">${endDate}</td></tr><tr><td style="padding:8px 0;color:#6b7280;">Talep Eden:</td><td style="padding:8px 0;font-weight:500;">${requester.name} (${requester.email})</td></tr>${descriptionRow}</table></div><div style="background:#fef3c7;padding:15px;border-radius:8px;border-left:4px solid #f59e0b;margin:20px 0;"><strong>Dikkat:</strong> Bu toplanti icin ikram hazirligi yapilmasi gerekmektedir.</div><p style="background:#e0f2fe;padding:15px;border-radius:8px;border-left:4px solid #0284c7;margin:20px 0;"><strong>Ipucu:</strong> Takvim uygulamanizda etkinligi eklemek icin ekteki davet.ics dosyasini acin.</p><hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;"><p style="color:#6b7280;font-size:14px;margin-bottom:0;">Bu email Ferko Space Manager tarafindan otomatik olarak gonderilmistir.</p></div></body></html>`;
+    return `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;"><div style="background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);padding:30px;border-radius:10px 10px 0 0;"><h1 style="color:white;margin:0;font-size:24px;">Rezervasyon Ikram Talebi</h1></div><div style="background:#f9fafb;padding:30px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;"><p style="margin-top:0;">Merhaba,</p><p><strong>${safeRequesterName}</strong> tarafindan olusturulan bir toplanti icin <strong style="color:#d97706;">ikram talep edilmistir</strong>.</p><div style="background:white;padding:20px;border-radius:8px;border:1px solid #e5e7eb;margin:20px 0;"><h2 style="margin-top:0;color:#d97706;font-size:18px;">${safeTitle}</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#6b7280;width:120px;">Oda:</td><td style="padding:8px 0;font-weight:500;">${safeRoomName}</td></tr><tr><td style="padding:8px 0;color:#6b7280;">Baslangic:</td><td style="padding:8px 0;font-weight:500;">${startDate}</td></tr><tr><td style="padding:8px 0;color:#6b7280;">Bitis:</td><td style="padding:8px 0;font-weight:500;">${endDate}</td></tr><tr><td style="padding:8px 0;color:#6b7280;">Talep Eden:</td><td style="padding:8px 0;font-weight:500;">${safeRequesterName} (${safeRequesterEmail})</td></tr>${descriptionRow}</table></div><div style="background:#fef3c7;padding:15px;border-radius:8px;border-left:4px solid #f59e0b;margin:20px 0;"><strong>Dikkat:</strong> Bu toplanti icin ikram hazirligi yapilmasi gerekmektedir.</div><p style="background:#e0f2fe;padding:15px;border-radius:8px;border-left:4px solid #0284c7;margin:20px 0;"><strong>Ipucu:</strong> Takvim uygulamanizda etkinligi eklemek icin ekteki davet.ics dosyasini acin.</p><hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;"><p style="color:#6b7280;font-size:14px;margin-bottom:0;">Bu email Ferko Space Manager tarafindan otomatik olarak gonderilmistir.</p></div></body></html>`;
 }
 
-// Base64 encode helper
-function base64Encode(str: string): string {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(str);
-    let binary = "";
-    for (let i = 0; i < data.length; i++) {
-        binary += String.fromCharCode(data[i]);
+function generateEmailText(params: CateringNotificationRequest): string {
+    const { reservation, requester } = params;
+    const lines = [
+        "Merhaba,",
+        "",
+        `${stripHtml(requester.name)} tarafindan olusturulan bir toplanti icin ikram talep edilmistir.`,
+        "",
+        `Baslik: ${stripHtml(reservation.title)}`,
+        `Oda: ${stripHtml(reservation.roomName)}`,
+        `Baslangic: ${formatDateTurkish(reservation.startTime)}`,
+        `Bitis: ${formatDateTurkish(reservation.endTime)}`,
+        `Talep Eden: ${stripHtml(requester.name)} (${stripHtml(requester.email)})`,
+    ];
+
+    if (reservation.description) {
+        lines.push(`Aciklama: ${stripHtml(reservation.description)}`);
     }
-    return btoa(binary);
+
+    lines.push("", "Bu email Ferko Space Manager tarafindan otomatik olarak gonderilmistir.");
+    return lines.join("\n");
 }
 
 serve(async (req) => {
@@ -142,16 +175,20 @@ serve(async (req) => {
 
         const icsContent = generateICS({
             uid: `catering-${reservation.id}@ferko-space-manager.com`,
-            title: `[IKRAM] ${reservation.title}`,
-            description: `Ikram Talebi - Toplanti: ${reservation.title} - Talep Eden: ${requester.name} (${requester.email})`,
+            title: `[IKRAM] ${stripHtml(reservation.title)}`,
+            description: `Ikram Talebi - Toplanti: ${stripHtml(reservation.title)} - Talep Eden: ${stripHtml(requester.name)} (${stripHtml(requester.email)})`,
             startTime: reservation.startTime,
             endTime: reservation.endTime,
-            location: `Ferko - ${reservation.roomName}`,
-            organizerEmail: requester.email,
-            organizerName: requester.name,
+            location: `Ferko - ${stripHtml(reservation.roomName)}`,
+            organizerEmail: stripHtml(requester.email),
+            organizerName: stripHtml(requester.name),
         });
 
         const emailHTML = generateEmailHTML(params);
+        const plainText = generateEmailText(params);
+        const subjectTitleRaw = stripHtml(reservation.title);
+        const subjectTitle =
+            subjectTitleRaw.length > 80 ? `${subjectTitleRaw.slice(0, 77)}...` : subjectTitleRaw;
 
         const client = new SMTPClient({
             connection: {
@@ -168,17 +205,27 @@ serve(async (req) => {
         await client.send({
             from: SMTP_USERNAME,
             to: CATERING_NOTIFICATION_EMAIL,
-            subject: `Rezervasyon Ikram Talebi: ${reservation.title}`,
-            content: "Bu email HTML destekli bir email istemcisi gerektirmektedir.",
-            html: emailHTML,
-            attachments: [
+            subject: `Rezervasyon Ikram Talebi: ${subjectTitle}`,
+            mimeContent: [
                 {
-                    filename: "davet.ics",
-                    content: base64Encode(icsContent),
-                    encoding: "base64",
-                    contentType: "text/calendar; charset=utf-8; method=REQUEST",
+                    mimeType: 'text/plain; charset="utf-8"',
+                    content: quotedPrintableEncode(plainText),
+                    transferEncoding: "quoted-printable",
+                },
+                {
+                    mimeType: 'text/html; charset="utf-8"',
+                    content: quotedPrintableEncode(emailHTML),
+                    transferEncoding: "quoted-printable",
+                },
+                {
+                    mimeType: 'text/calendar; charset="utf-8"; method=REQUEST',
+                    content: quotedPrintableEncode(icsContent),
+                    transferEncoding: "quoted-printable",
                 },
             ],
+            headers: {
+                "Content-Class": "urn:content-classes:calendarmessage",
+            },
         });
 
         await client.close();

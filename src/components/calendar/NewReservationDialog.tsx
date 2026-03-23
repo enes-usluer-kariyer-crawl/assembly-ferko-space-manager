@@ -30,6 +30,7 @@ import { EmailAutocomplete } from "@/components/ui/email-autocomplete";
 import { createReservation, type Room, type ConflictingReservation } from "@/lib/actions/reservations";
 import { BIG_EVENT_TAGS } from "@/constants/events";
 import { ROOM_CAPACITIES } from "@/constants/rooms";
+import { TEAM_OPTIONS, type TeamName } from "@/constants/teams";
 import { AlertTriangle, Plus, X, Mail } from "lucide-react";
 
 type NewReservationDialogProps = {
@@ -87,6 +88,7 @@ export function NewReservationDialog({
   // Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [team, setTeam] = useState<TeamName | "">("");
   const [roomId, setRoomId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -119,6 +121,7 @@ export function NewReservationDialog({
       setBlockingConflicts(null);
       setTitle("");
       setDescription("");
+      setTeam("");
       setRoomId(initialRoomId || "");
       setSelectedTags([]);
       setCateringRequested(false);
@@ -260,6 +263,11 @@ export function NewReservationDialog({
       return;
     }
 
+    if (!team) {
+      setError("Lütfen bir ekip seçin.");
+      return;
+    }
+
     if (!formRoomId) {
       setError("Lütfen bir oda seçin.");
       return;
@@ -293,6 +301,7 @@ export function NewReservationDialog({
     try {
       const result = await createReservation({
         roomId: formRoomId,
+        team,
         title: formTitle.trim(),
         description: description?.trim() || undefined,
         startTime: startDateTime,
@@ -320,6 +329,10 @@ export function NewReservationDialog({
         toast.error(errorMessage);
         // Do NOT close the modal - user can pick a new time
         return;
+      }
+
+      if (result.warning) {
+        toast.warning(result.warning);
       }
 
       // Trigger server data re-fetch to update calendar without page reload
@@ -445,6 +458,24 @@ export function NewReservationDialog({
               <p className="text-xs text-muted-foreground">
                 Büyük etkinlikler tüm odaları bloke eder. Yalnızca bir etiket seçilebilir.
               </p>
+            </div>
+
+            {/* Room selection */}
+            <div className="space-y-2">
+              <Label htmlFor="team">Ekip *</Label>
+              <input type="hidden" name="team" value={team} />
+              <Select value={team} onValueChange={(value) => setTeam(value as TeamName)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Ekip seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEAM_OPTIONS.map((teamOption) => (
+                    <SelectItem key={teamOption} value={teamOption}>
+                      {teamOption}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Room selection */}

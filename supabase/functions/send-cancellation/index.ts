@@ -26,7 +26,7 @@ type CancellationRequest = {
   };
   organizer: {
     name: string;
-    email: string;
+    email?: string;
   };
 };
 
@@ -91,8 +91,26 @@ function formatDateTurkish(dateStr: string): string {
   });
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function stripHtml(value?: string): string {
+  if (!value) return "";
+  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function generateEmailHTML(params: CancellationRequest): string {
   const { reservation, organizer } = params;
+  const safeTitle = escapeHtml(stripHtml(reservation.title));
+  const safeRoomName = escapeHtml(stripHtml(reservation.roomName));
+  const safeOrganizerName = escapeHtml(stripHtml(organizer.name));
+  const safeDescription = escapeHtml(stripHtml(reservation.description));
 
   return `<!DOCTYPE html>
 <html lang="tr">
@@ -108,15 +126,15 @@ function generateEmailHTML(params: CancellationRequest): string {
   <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
     <p style="margin-top: 0;">Merhaba,</p>
 
-    <p><strong>${organizer.name}</strong> tarafindan planlanan toplanti iptal edilmistir.</p>
+    <p><strong>${safeOrganizerName}</strong> tarafindan planlanan toplanti iptal edilmistir.</p>
 
     <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb; margin: 20px 0;">
-      <h2 style="margin-top: 0; color: #b91c1c; font-size: 18px;">${reservation.title}</h2>
+      <h2 style="margin-top: 0; color: #b91c1c; font-size: 18px;">${safeTitle}</h2>
 
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 8px 0; color: #6b7280; width: 100px;">Oda:</td>
-          <td style="padding: 8px 0; font-weight: 500;">${reservation.roomName}</td>
+          <td style="padding: 8px 0; font-weight: 500;">${safeRoomName}</td>
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #6b7280;">Baslangic:</td>
@@ -126,10 +144,10 @@ function generateEmailHTML(params: CancellationRequest): string {
           <td style="padding: 8px 0; color: #6b7280;">Bitis:</td>
           <td style="padding: 8px 0; font-weight: 500;">${formatDateTurkish(reservation.endTime)}</td>
         </tr>
-        ${reservation.description ? `
+        ${safeDescription ? `
         <tr>
           <td style="padding: 8px 0; color: #6b7280; vertical-align: top;">Aciklama:</td>
-          <td style="padding: 8px 0;">${reservation.description}</td>
+          <td style="padding: 8px 0; white-space: pre-wrap;">${safeDescription}</td>
         </tr>
         ` : ""}
       </table>
@@ -149,6 +167,27 @@ function generateEmailHTML(params: CancellationRequest): string {
 </html>`;
 }
 
+function generateEmailText(params: CancellationRequest): string {
+  const { reservation, organizer } = params;
+  const lines = [
+    "Merhaba,",
+    "",
+    `${stripHtml(organizer.name)} tarafindan planlanan toplanti iptal edilmistir.`,
+    "",
+    `Baslik: ${stripHtml(reservation.title)}`,
+    `Oda: ${stripHtml(reservation.roomName)}`,
+    `Baslangic: ${formatDateTurkish(reservation.startTime)}`,
+    `Bitis: ${formatDateTurkish(reservation.endTime)}`,
+  ];
+
+  if (reservation.description) {
+    lines.push(`Aciklama: ${stripHtml(reservation.description)}`);
+  }
+
+  lines.push("", "Bu email Ferko Space Manager tarafindan otomatik olarak gonderilmistir.");
+  return lines.join("\n");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -158,12 +197,16 @@ serve(async (req) => {
     const params: CancellationRequest = await req.json();
     const { to, reservation, organizer } = params;
 
-    if (!to || !reservation?.id || !reservation?.title || !organizer?.email) {
+    if (!to || !reservation?.id || !reservation?.title) {
       return new Response(
         JSON.stringify({ success: false, error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const recipientEmail = stripHtml(to).trim().toLowerCase();
+    const organizerEmail = stripHtml(organizer?.email).trim().toLowerCase() || SMTP_USERNAME;
+    const organizerName = stripHtml(organizer?.name) || "Assembly Space";
 
     if (!SMTP_USERNAME || !SMTP_PASSWORD) {
       console.error("SMTP credentials not configured");
@@ -175,14 +218,14 @@ serve(async (req) => {
 
     const icsContent = generateICS({
       uid: `${reservation.id}@ferko-space-manager.com`,
-      title: reservation.title,
-      description: reservation.description,
+      title: stripHtml(reservation.title),
+      description: stripHtml(reservation.description),
       startTime: reservation.startTime,
       endTime: reservation.endTime,
-      location: `Ferko - ${reservation.roomName}`,
-      organizerEmail: organizer.email,
-      organizerName: organizer.name,
-      attendeeEmail: to,
+      location: `Ferko - ${stripHtml(reservation.roomName)}`,
+      organizerEmail,
+      organizerName,
+      attendeeEmail: recipientEmail,
     });
 
     const emailHTML = generateEmailHTML(params);
@@ -199,12 +242,15 @@ serve(async (req) => {
       },
     });
 
-    const plainText = `Merhaba,\n\n${organizer.name} tarafindan planlanan toplanti iptal edilmistir.\n\nBaslik: ${reservation.title}\nOda: ${reservation.roomName}\nBaslangic: ${formatDateTurkish(reservation.startTime)}\nBitis: ${formatDateTurkish(reservation.endTime)}\n\nBu email Ferko Space Manager tarafindan otomatik olarak gonderilmistir.`;
+    const plainText = generateEmailText(params);
+    const subjectTitleRaw = stripHtml(reservation.title);
+    const subjectTitle =
+      subjectTitleRaw.length > 80 ? `${subjectTitleRaw.slice(0, 77)}...` : subjectTitleRaw;
 
     await client.send({
       from: SMTP_USERNAME,
-      to: to,
-      subject: `Toplanti Iptali: ${reservation.title}`,
+      to: recipientEmail,
+      subject: `Toplanti Iptali: ${subjectTitle}`,
       mimeContent: [
         {
           mimeType: 'text/plain; charset="utf-8"',
@@ -216,15 +262,14 @@ serve(async (req) => {
           content: quotedPrintableEncode(emailHTML),
           transferEncoding: "quoted-printable",
         },
+      ],
+      attachments: [
         {
-          mimeType: 'text/calendar; charset="utf-8"; method=CANCEL',
-          content: quotedPrintableEncode(icsContent),
-          transferEncoding: "quoted-printable",
+          filename: "iptal.ics",
+          content: new TextEncoder().encode(icsContent),
+          contentType: "text/calendar; charset=utf-8; method=CANCEL",
         },
       ],
-      headers: {
-        "Content-Class": "urn:content-classes:calendarmessage",
-      },
     });
 
     await client.close();

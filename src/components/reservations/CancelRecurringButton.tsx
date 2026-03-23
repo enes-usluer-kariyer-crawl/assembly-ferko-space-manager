@@ -69,6 +69,9 @@ export function CancelRecurringButton({
         toast.error(result.message || "Rezervasyon iptal edilirken bir hata oluştu.");
       } else {
         toast.success("Tüm haftalık rezervasyonlar başarıyla iptal edildi.");
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
         setShowDialog(false);
       }
     } catch (error) {
@@ -92,6 +95,9 @@ export function CancelRecurringButton({
         toast.error(result.message || "Rezervasyon iptal edilirken bir hata oluştu.");
       } else {
         toast.success("Seçilen tarih için rezervasyon başarıyla iptal edildi.");
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
         setShowDialog(false);
         setSelectedDate("");
       }

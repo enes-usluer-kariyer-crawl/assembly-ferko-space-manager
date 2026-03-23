@@ -50,6 +50,7 @@ type CalendarEvent = {
     roomName: string;
     roomId: string;
     status: string;
+    team?: string;
     description: string | null;
     tags?: string[];
     cateringRequested?: boolean;
@@ -96,6 +97,11 @@ function EventComponent({ event }: { event: CalendarEvent }) {
           <div className="text-sm">
             <span className="text-muted-foreground">Oda:</span> {event.resource.roomName}
           </div>
+          {event.resource.team && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Ekip:</span> {event.resource.team}
+            </div>
+          )}
           {(event.resource.userEmail || event.resource.userFullName) && (
             <div className="text-sm">
               <span className="text-muted-foreground">Oluşturan:</span> {event.resource.userEmail || event.resource.userFullName}
@@ -247,6 +253,7 @@ export function BookingCalendar({ initialReservations, rooms, onRefresh, isAuthe
           roomName: reservation.rooms.name,
           roomId: reservation.room_id,
           status: reservation.status,
+          team: reservation.team,
           description: reservation.description,
           tags: reservation.tags,
           cateringRequested: reservation.catering_requested,

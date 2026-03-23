@@ -6,7 +6,36 @@ import { checkAvailability } from "./availability";
 import { ROOM_CAPACITIES, COMBINED_ROOMS } from "@/constants/rooms";
 import { sendTeamsReservationAlert } from "@/lib/notifications/teams";
 import { BIG_EVENT_TAGS, BIG_EVENT_BLOCK_LABEL } from "@/constants/events";
+import { type ReservationTeam, isValidReservationTeam } from "@/constants/teams";
 
+
+async function getAccessTokenForFunctionCalls(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string | undefined> {
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (sessionError) {
+    console.error("Error getting session access token for function calls:", sessionError);
+    return undefined;
+  }
+
+  if (session?.refresh_token) {
+    const { data, error: refreshError } = await supabase.auth.refreshSession({
+      refresh_token: session.refresh_token,
+    });
+
+    if (refreshError) {
+      console.warn("Could not refresh session before invoking mail function:", refreshError.message);
+    } else if (data.session?.access_token) {
+      return data.session.access_token;
+    }
+  }
+
+  return session?.access_token;
+}
 
 
 function isBigEventRequest(tags: string[]): boolean {
@@ -26,6 +55,7 @@ export type Reservation = {
   id: string;
   room_id: string;
   user_id: string;
+  team: ReservationTeam;
   title: string;
   description: string | null;
   start_time: string;
@@ -75,6 +105,7 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
       id,
       room_id,
       user_id,
+      team,
       title,
       description,
       start_time,
@@ -274,6 +305,7 @@ export type RecurrenceEndType = "never" | "count" | "date";
 
 export type CreateReservationInput = {
   roomId: string;
+  team: ReservationTeam;
   title: string;
   description?: string;
   startTime: string;
@@ -300,6 +332,7 @@ export type CreateReservationResult = {
   success: boolean;
   error?: string;
   reservationId?: string;
+  warning?: string;
   // For Big Events: warnings about existing meetings that clash
   conflictWarning?: {
     message: string;
@@ -314,15 +347,22 @@ export async function createReservation(
   input: CreateReservationInput
 ): Promise<CreateReservationResult> {
   const {
-    roomId, title, description, startTime, endTime, tags, cateringRequested,
+    roomId, team, title, description, startTime, endTime, tags, cateringRequested,
     recurrencePattern, recurrenceEndType, recurrenceCount, recurrenceEndDate, attendees
   } = input;
 
   // Validate required fields
-  if (!roomId || !title || !startTime || !endTime) {
+  if (!roomId || !title || !startTime || !endTime || !team) {
     return {
       success: false,
-      error: "Gerekli alanlar eksik: Oda, başlık, başlangıç ve bitiş zamanı gereklidir.",
+      error: "Gerekli alanlar eksik: Oda, ekip, başlık, başlangıç ve bitiş zamanı gereklidir.",
+    };
+  }
+
+  if (!isValidReservationTeam(team) || team === "Belirtilmedi") {
+    return {
+      success: false,
+      error: "Lütfen geçerli bir ekip seçin.",
     };
   }
 
@@ -382,6 +422,8 @@ export async function createReservation(
     };
   }
 
+  const functionAccessToken = await getAccessTokenForFunctionCalls(supabase);
+
   // Validate room exists and get capacity
   const { data: room, error: roomError } = await supabase
     .from("rooms")
@@ -437,6 +479,7 @@ export async function createReservation(
 
   const isBigEvent = isBigEventRequest(tags ?? []);
   let conflictWarning: CreateReservationResult["conflictWarning"] = undefined;
+  let invitationWarning: string | undefined;
 
   // For Big Events: Check for existing bookings that conflict and BLOCK creation
   // Admin must manually cancel these reservations first
@@ -490,8 +533,14 @@ export async function createReservation(
   const isRecurring = recurrencePattern !== undefined && recurrencePattern !== "none";
 
   // Ensure requester is in attendees list to receive calendar invite
-  const requesterEmail = user.email;
-  const finalAttendees = [...(attendees ?? [])];
+  const requesterEmail = user.email?.trim().toLowerCase();
+  const finalAttendees = Array.from(
+    new Set(
+      (attendees ?? [])
+        .map((email) => email.trim().toLowerCase())
+        .filter((email) => email.length > 0)
+    )
+  );
 
   if (requesterEmail && !finalAttendees.includes(requesterEmail)) {
     finalAttendees.push(requesterEmail);
@@ -505,6 +554,7 @@ export async function createReservation(
     .insert({
       room_id: roomId,
       user_id: user.id,
+      team,
       title,
       description: description ?? null,
       start_time: startTime,
@@ -544,6 +594,7 @@ export async function createReservation(
     .single();
 
   const userName = userProfile?.full_name || userProfile?.email || "Unknown User";
+  const organizerEmail = userProfile?.email || requesterEmail || "";
 
   if (status === "pending") {
     await sendTeamsReservationAlert({
@@ -577,8 +628,10 @@ export async function createReservation(
       },
       requester: {
         name: userName,
-        email: userProfile?.email || "",
+        email: organizerEmail,
       },
+    }, {
+      accessToken: functionAccessToken,
     });
 
     if (cateringResult.success) {
@@ -614,8 +667,10 @@ export async function createReservation(
       },
       requester: {
         name: userName,
-        email: userProfile?.email || "",
+        email: organizerEmail,
       },
+    }, {
+      accessToken: functionAccessToken,
     });
 
     if (notificationResult.success) {
@@ -641,7 +696,10 @@ export async function createReservation(
       },
       {
         name: userName,
-        email: userProfile?.email || "",
+        email: organizerEmail,
+      },
+      {
+        accessToken: functionAccessToken,
       }
     );
 
@@ -650,6 +708,7 @@ export async function createReservation(
     }
     if (failed.length > 0) {
       console.warn(`[INVITATION] Failed to send ${failed.length} invitation(s)`);
+      invitationWarning = `Davet e-postalarından ${failed.length} tanesi gönderilemedi. Lütfen e-posta adreslerini ve mail altyapısını kontrol edin.`;
     }
   }
 
@@ -682,6 +741,7 @@ export async function createReservation(
       const blockedReservations = otherRooms.map((otherRoom) => ({
         room_id: otherRoom.id,
         user_id: user.id,
+        team,
         title: BIG_EVENT_BLOCK_LABEL,
         description: `Blocked due to Big Event: ${title}`,
         start_time: blockStartTime,
@@ -718,12 +778,14 @@ export async function createReservation(
     success: true,
     reservationId: reservation.id,
     conflictWarning,
+    warning: invitationWarning,
   };
 }
 
 export type UpdateReservationStatusResult = {
   success: boolean;
   error?: string;
+  warning?: string;
 };
 
 export async function updateReservationStatus(
@@ -758,6 +820,8 @@ export async function updateReservationStatus(
       error: "Rezervasyonu güncellemek için giriş yapmanız gerekiyor.",
     };
   }
+
+  const functionAccessToken = await getAccessTokenForFunctionCalls(supabase);
 
   // Check if user is admin
   const { data: profile, error: profileError } = await supabase
@@ -817,6 +881,7 @@ export async function updateReservationStatus(
   }
 
   const previousStatus = reservation.status as Reservation["status"];
+  let invitationWarning: string | undefined;
 
   // Prevent modifying past events
   if (new Date(reservation.end_time) < new Date()) {
@@ -886,7 +951,10 @@ export async function updateReservationStatus(
         },
         {
           name: requesterName,
-          email: requesterProfile?.email || "",
+          email: requesterProfile?.email || attendees[0] || "",
+        },
+        {
+          accessToken: functionAccessToken,
         }
       );
 
@@ -895,6 +963,7 @@ export async function updateReservationStatus(
       }
       if (failed.length > 0) {
         console.warn(`[INVITATION] Failed to send ${failed.length} invitation(s)`);
+        invitationWarning = `Davet e-postalarından ${failed.length} tanesi gönderilemedi. Lütfen e-posta adreslerini ve mail altyapısını kontrol edin.`;
       }
     }
 
@@ -918,6 +987,8 @@ export async function updateReservationStatus(
         name: requesterName,
         email: requesterProfile?.email || "",
       },
+    }, {
+      accessToken: functionAccessToken,
     });
 
     if (notificationResult.success) {
@@ -948,12 +1019,14 @@ export async function updateReservationStatus(
 
   return {
     success: true,
+    warning: invitationWarning,
   };
 }
 
 export type PendingReservation = {
   id: string;
   title: string;
+  team: ReservationTeam;
   start_time: string;
   end_time: string;
   catering_requested: boolean;
@@ -984,6 +1057,7 @@ export async function getPendingReservations(): Promise<{
       `
       id,
       title,
+      team,
       start_time,
       end_time,
       catering_requested,
@@ -1026,11 +1100,13 @@ export async function getPendingReservations(): Promise<{
 export type CancelReservationResult = {
   success: boolean;
   message?: string;
+  warning?: string;
 };
 
 export type CancelRecurringInstanceResult = {
   success: boolean;
   message?: string;
+  warning?: string;
 };
 
 export async function cancelReservation(
@@ -1057,6 +1133,8 @@ export async function cancelReservation(
       message: "Bu işlem için giriş yapmanız gerekiyor.",
     };
   }
+
+  const functionAccessToken = await getAccessTokenForFunctionCalls(supabase);
 
   // Fetch the reservation to get the owner and end_time
   const { data: reservation, error: reservationError } = await supabase
@@ -1127,7 +1205,7 @@ export async function cancelReservation(
     };
   }
 
-  const attendees = Array.isArray(reservation.attendees) ? reservation.attendees : [];
+  let cancellationWarning: string | undefined;
   const rawProfiles = reservation.profiles as unknown;
   const organizerProfile = (Array.isArray(rawProfiles) ? rawProfiles[0] : rawProfiles) as
     | { full_name: string | null; email: string }
@@ -1141,12 +1219,20 @@ export async function cancelReservation(
     | null
     | undefined;
   const roomName = roomRecord?.name || "Bilinmeyen Oda";
+  const attendees = Array.isArray(reservation.attendees) ? reservation.attendees : [];
+  const recipientsToCancel = Array.from(
+    new Set(
+      [...attendees, organizerEmail]
+        .map((email) => email.trim().toLowerCase())
+        .filter((email) => email.length > 0)
+    )
+  );
 
-  if (attendees.length > 0 && organizerEmail) {
+  if (recipientsToCancel.length > 0) {
     const { sendCancellationEmails } = await import("@/lib/email/send-cancellation");
 
     const { sent, failed } = await sendCancellationEmails(
-      attendees,
+      recipientsToCancel,
       {
         id: reservation.id,
         title: reservation.title,
@@ -1158,6 +1244,9 @@ export async function cancelReservation(
       {
         name: organizerName,
         email: organizerEmail,
+      },
+      {
+        accessToken: functionAccessToken,
       }
     );
 
@@ -1166,6 +1255,7 @@ export async function cancelReservation(
     }
     if (failed.length > 0) {
       console.warn(`[CANCELLATION] Failed to send ${failed.length} cancellation(s)`);
+      cancellationWarning = `Iptal e-postalarindan ${failed.length} tanesi gonderilemedi. Lutfen e-posta adreslerini ve mail altyapisini kontrol edin.`;
     }
   }
 
@@ -1276,6 +1366,7 @@ export async function cancelReservation(
 
   return {
     success: true,
+    warning: cancellationWarning,
     message: "Rezervasyon başarıyla iptal edildi.",
   };
 }
@@ -1296,6 +1387,7 @@ export async function cancelRecurringInstance(
   }
 
   const supabase = await createClient();
+  let cancellationWarning: string | undefined;
 
   // Get current user
   const {
@@ -1310,10 +1402,12 @@ export async function cancelRecurringInstance(
     };
   }
 
+  const functionAccessToken = await getAccessTokenForFunctionCalls(supabase);
+
   // Fetch the parent reservation
   const { data: parentReservation, error: parentError } = await supabase
     .from("reservations")
-    .select("*")
+    .select("*, rooms(name), profiles!reservations_user_id_fkey(full_name, email)")
     .eq("id", parentReservationId)
     .single();
 
@@ -1404,6 +1498,7 @@ export async function cancelRecurringInstance(
       .insert({
         room_id: parentReservation.room_id,
         user_id: parentReservation.user_id,
+        team: parentReservation.team,
         title: parentReservation.title,
         description: parentReservation.description,
         start_time: instanceStart.toISOString(),
@@ -1425,6 +1520,59 @@ export async function cancelRecurringInstance(
     }
   }
 
+  const rawProfiles = parentReservation.profiles as unknown;
+  const organizerProfile = (Array.isArray(rawProfiles) ? rawProfiles[0] : rawProfiles) as
+    | { full_name: string | null; email: string }
+    | null
+    | undefined;
+  const organizerName = organizerProfile?.full_name || organizerProfile?.email || "Unknown User";
+  const organizerEmail = organizerProfile?.email || "";
+  const rawRooms = parentReservation.rooms as unknown;
+  const roomRecord = (Array.isArray(rawRooms) ? rawRooms[0] : rawRooms) as
+    | { name: string }
+    | null
+    | undefined;
+  const roomName = roomRecord?.name || "Bilinmeyen Oda";
+  const attendees = Array.isArray(parentReservation.attendees) ? parentReservation.attendees : [];
+  const recipientsToCancel = Array.from(
+    new Set(
+      [...attendees, organizerEmail]
+        .map((email) => email.trim().toLowerCase())
+        .filter((email) => email.length > 0)
+    )
+  );
+
+  if (recipientsToCancel.length > 0) {
+    const { sendCancellationEmails } = await import("@/lib/email/send-cancellation");
+
+    const { sent, failed } = await sendCancellationEmails(
+      recipientsToCancel,
+      {
+        id: `${parentReservation.id}-${instanceStart.toISOString()}`,
+        title: parentReservation.title,
+        description: parentReservation.description ?? undefined,
+        startTime: instanceStart.toISOString(),
+        endTime: instanceEnd.toISOString(),
+        roomName,
+      },
+      {
+        name: organizerName,
+        email: organizerEmail,
+      },
+      {
+        accessToken: functionAccessToken,
+      }
+    );
+
+    if (sent.length > 0) {
+      console.log(`[CANCELLATION] Successfully sent ${sent.length} single-instance cancellation(s)`);
+    }
+    if (failed.length > 0) {
+      console.warn(`[CANCELLATION] Failed to send ${failed.length} single-instance cancellation(s)`);
+      cancellationWarning = `Iptal e-postalarindan ${failed.length} tanesi gonderilemedi. Lutfen e-posta adreslerini ve mail altyapisini kontrol edin.`;
+    }
+  }
+
   // Revalidate paths to refresh data
   revalidatePath("/");
   revalidatePath("/reservations");
@@ -1433,6 +1581,7 @@ export async function cancelRecurringInstance(
   return {
     success: true,
     message: "Seçilen tarih için rezervasyon başarıyla iptal edildi.",
+    warning: cancellationWarning,
   };
 }
 
@@ -1440,6 +1589,7 @@ export async function cancelRecurringInstance(
 
 export type UpdateReservationInput = {
   id: string;
+  team?: ReservationTeam;
   title?: string;
   description?: string;
   startTime?: string;
@@ -1462,7 +1612,22 @@ export type UpdateReservationResult = {
 export async function updateReservation(
   input: UpdateReservationInput
 ): Promise<UpdateReservationResult> {
-  const { id, title, description, startTime, endTime, roomId, attendees, cateringRequested, tags, recurrencePattern, recurrenceEndType, recurrenceCount, recurrenceEndDate } = input;
+  const {
+    id,
+    team,
+    title,
+    description,
+    startTime,
+    endTime,
+    roomId,
+    attendees,
+    cateringRequested,
+    tags,
+    recurrencePattern,
+    recurrenceEndType,
+    recurrenceCount,
+    recurrenceEndDate,
+  } = input;
 
   if (!id) {
     return { success: false, error: "Rezervasyon ID gereklidir." };
@@ -1479,6 +1644,8 @@ export async function updateReservation(
   if (userError || !user) {
     return { success: false, error: "Bu işlem için giriş yapmanız gerekiyor." };
   }
+
+  const functionAccessToken = await getAccessTokenForFunctionCalls(supabase);
 
   // Check if user is admin
   const { data: profile } = await supabase
@@ -1520,6 +1687,11 @@ export async function updateReservation(
   const newEndTime = endTime || oldReservation.end_time;
   const newRoomId = roomId || oldReservation.room_id;
   const newTags = tags || oldReservation.tags || [];
+  const newTeam = team ?? oldReservation.team ?? "Belirtilmedi";
+
+  if (!isValidReservationTeam(newTeam) || newTeam === "Belirtilmedi") {
+    return { success: false, error: "Lütfen geçerli bir ekip seçin." };
+  }
 
   // Check date validity if changed
   if (startTime || endTime) {
@@ -1607,6 +1779,7 @@ export async function updateReservation(
     start_time: newStartTime,
     end_time: newEndTime,
     room_id: newRoomId,
+    team: newTeam,
     attendees: updatedAttendees,
     catering_requested: cateringRequested !== undefined ? cateringRequested : oldReservation.catering_requested,
     tags: newTags,
@@ -1667,6 +1840,8 @@ export async function updateReservation(
         email: requesterEmail || "unknown@email.com",
       },
       cancellationReason: "Rezervasyon güncellendi ve yeniden oluşturuldu.", // Custom reason
+    }, {
+      accessToken: functionAccessToken,
     });
 
     // Send ICS Cancellation to attendees to remove the OLD event from their calendars
@@ -1692,6 +1867,9 @@ export async function updateReservation(
         {
           name: (oldReservation.profiles as any)?.full_name || "Unknown Owner",
           email: requesterEmail || "unknown@email.com",
+        },
+        {
+          accessToken: functionAccessToken,
         }
       );
       console.log(`[UPDATE] Sent ICS cancellation for old event version to ${attendeesToCancel.length} recipients.`);
@@ -1717,6 +1895,8 @@ export async function updateReservation(
         name: userName,
         email: userEmail,
       },
+    }, {
+      accessToken: functionAccessToken,
     });
 
     // 3. Send Invitation Emails (Calendar Invite) for the NEW details
@@ -1739,6 +1919,9 @@ export async function updateReservation(
         {
           name: userName,
           email: userEmail,
+        },
+        {
+          accessToken: functionAccessToken,
         }
       );
     }
@@ -1762,6 +1945,7 @@ export async function updateReservation(
 
 export type ActiveReservation = {
   id: string;
+  team: ReservationTeam;
   title: string;
   description: string | null;
   start_time: string;
@@ -1808,6 +1992,7 @@ export async function getActiveReservations(): Promise<{
     .from("reservations")
     .select(`
       id,
+      team,
       title,
       description,
       start_time,

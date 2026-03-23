@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { invokeSupabaseFunction } from "@/lib/email/invoke-supabase-function";
 
 export type SendCateringNotificationParams = {
     reservation: {
@@ -22,23 +22,28 @@ export type SendCateringNotificationResult = {
     error?: string;
 };
 
+type SendCateringNotificationOptions = {
+    accessToken?: string;
+};
+
 /**
  * İkram talebi olduğunda Oylum'a bildirim e-postası gönderir.
  * E-posta içinde toplantı bilgileri ve takvim daveti (ICS) dosyası bulunur.
  */
 export async function sendCateringNotification(
-    params: SendCateringNotificationParams
+    params: SendCateringNotificationParams,
+    options?: SendCateringNotificationOptions
 ): Promise<SendCateringNotificationResult> {
     try {
-        const supabase = await createClient();
-
-        const { data, error } = await supabase.functions.invoke("send-catering-notification", {
-            body: params,
-        });
+        const { data, error } = await invokeSupabaseFunction<{ success?: boolean; error?: string }>(
+            "send-catering-notification",
+            params,
+            options
+        );
 
         if (error) {
             console.error("Error invoking send-catering-notification function:", error);
-            return { success: false, error: error.message };
+            return { success: false, error };
         }
 
         if (data && !data.success) {

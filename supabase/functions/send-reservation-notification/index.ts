@@ -1,10 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import {
+    SMTPClient,
+    quotedPrintableEncode,
+} from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const SMTP_HOSTNAME = Deno.env.get("SMTP_HOSTNAME") || "smtp.gmail.com";
 const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "465");
 const SMTP_USERNAME = Deno.env.get("SMTP_USERNAME") || "assembly.bildirim@gmail.com";
 const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD") || "ocho auac jnzv vakf";
+const WIFI_PASSWORD_NOTE = "Assembly Wifi Sifresi: Assembly04*";
 
 // Bildirim alacak kişiler
 const NOTIFICATION_RECIPIENTS = [
@@ -54,10 +58,30 @@ function formatDateTurkish(dateStr: string): string {
     });
 }
 
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function stripHtml(value?: string): string {
+    if (!value) return "";
+    return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function generateEmailHTML(params: ReservationNotificationRequest): string {
     const { notificationType, reservation, requester, cancellationReason } = params;
     const startDate = formatDateTurkish(reservation.startTime);
     const endDate = formatDateTurkish(reservation.endTime);
+    const safeTitle = escapeHtml(stripHtml(reservation.title));
+    const safeRoomName = escapeHtml(stripHtml(reservation.roomName));
+    const safeRequesterName = escapeHtml(stripHtml(requester.name));
+    const safeRequesterEmail = escapeHtml(stripHtml(requester.email));
+    const safeDescription = escapeHtml(stripHtml(reservation.description));
+    const safeCancellationReason = escapeHtml(stripHtml(cancellationReason));
 
     const isPending = notificationType === "pending";
     const isCancelled = notificationType === "cancelled";
@@ -87,12 +111,12 @@ function generateEmailHTML(params: ReservationNotificationRequest): string {
         ? `<tr><td style="padding:8px 0;color:#6b7280;">Tekrar:</td><td style="padding:8px 0;font-weight:500;">${reservation.recurrencePattern === "daily" ? "Her Gun" : reservation.recurrencePattern === "weekly" ? "Her Hafta" : reservation.recurrencePattern === "biweekly" ? "Iki Haftada Bir" : reservation.recurrencePattern === "monthly" ? "Her Ay" : "Evet"}</td></tr>`
         : "";
 
-    const descriptionRow = reservation.description
-        ? `<tr><td style="padding:8px 0;color:#6b7280;vertical-align:top;">Aciklama:</td><td style="padding:8px 0;white-space:pre-wrap;">${reservation.description}</td></tr>`
+    const descriptionRow = safeDescription
+        ? `<tr><td style="padding:8px 0;color:#6b7280;vertical-align:top;">Aciklama:</td><td style="padding:8px 0;white-space:pre-wrap;">${safeDescription}</td></tr>`
         : "";
 
-    const cancellationRow = isCancelled && cancellationReason
-        ? `<tr><td style="padding:8px 0;color:#ef4444;vertical-align:top;font-weight:bold;">Iptal Nedeni:</td><td style="padding:8px 0;color:#ef4444;">${cancellationReason}</td></tr>`
+    const cancellationRow = isCancelled && safeCancellationReason
+        ? `<tr><td style="padding:8px 0;color:#ef4444;vertical-align:top;font-weight:bold;">Iptal Nedeni:</td><td style="padding:8px 0;color:#ef4444;">${safeCancellationReason}</td></tr>`
         : "";
 
     let infoBox = `<div style="background:#d1fae5;padding:15px;border-radius:8px;border-left:4px solid #10b981;margin:20px 0;"><strong>Bilgi:</strong> Bu rezervasyon onaylandi ve takvime eklendi.</div>`;
@@ -103,7 +127,94 @@ function generateEmailHTML(params: ReservationNotificationRequest): string {
         infoBox = `<div style="background:#fee2e2;padding:15px;border-radius:8px;border-left:4px solid #ef4444;margin:20px 0;"><strong>Bilgi:</strong> Bu rezervasyon iptal edilmistir ve takvimden silinmistir (veya durumu guncellenmistir).</div>`;
     }
 
-    return `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;"><div style="background:linear-gradient(135deg,${headerColor} 0%,${headerColor}dd 100%);padding:30px;border-radius:10px 10px 0 0;"><h1 style="color:white;margin:0;font-size:24px;">${headerTitle}</h1></div><div style="background:#f9fafb;padding:30px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;"><p style="margin-top:0;">Merhaba,</p><p><strong>${requester.name}</strong> tarafindan olusturulan bir rezervasyon <strong style="color:${statusColor};">${statusText}</strong>.</p><div style="background:white;padding:20px;border-radius:8px;border:1px solid #e5e7eb;margin:20px 0;"><h2 style="margin-top:0;color:${headerColor};font-size:18px;">${reservation.title}</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#6b7280;width:120px;">Oda:</td><td style="padding:8px 0;font-weight:500;">${reservation.roomName}</td></tr><tr><td style="padding:8px 0;color:#6b7280;">Baslangic:</td><td style="padding:8px 0;font-weight:500;">${startDate}</td></tr><tr><td style="padding:8px 0;color:#6b7280;">Bitis:</td><td style="padding:8px 0;font-weight:500;">${endDate}</td></tr><tr><td style="padding:8px 0;color:#6b7280;">Talep Eden:</td><td style="padding:8px 0;font-weight:500;">${requester.name} (${requester.email})</td></tr>${cancellationRow}${cateringRow}${recurringRow}${descriptionRow}</table></div>${infoBox}<hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;"><p style="color:#6b7280;font-size:14px;margin-bottom:0;">Bu email Ferko Space Manager tarafindan otomatik olarak gonderilmistir.</p></div></body></html>`;
+    return `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+</head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:linear-gradient(135deg,${headerColor} 0%,${headerColor}dd 100%);padding:30px;border-radius:10px 10px 0 0;">
+    <h1 style="color:white;margin:0;font-size:24px;">${headerTitle}</h1>
+  </div>
+  <div style="background:#f9fafb;padding:30px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;">
+    <p style="margin-top:0;">Merhaba,</p>
+    <p><strong>${safeRequesterName}</strong> tarafindan olusturulan bir rezervasyon <strong style="color:${statusColor};">${statusText}</strong>.</p>
+
+    <div style="background:white;padding:20px;border-radius:8px;border:1px solid #e5e7eb;margin:20px 0;">
+      <h2 style="margin-top:0;color:${headerColor};font-size:18px;">${safeTitle}</h2>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="padding:8px 0;color:#6b7280;width:120px;">Oda:</td>
+          <td style="padding:8px 0;font-weight:500;">${safeRoomName}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:#6b7280;">Baslangic:</td>
+          <td style="padding:8px 0;font-weight:500;">${startDate}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:#6b7280;">Bitis:</td>
+          <td style="padding:8px 0;font-weight:500;">${endDate}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:#6b7280;">Talep Eden:</td>
+          <td style="padding:8px 0;font-weight:500;">${safeRequesterName} (${safeRequesterEmail})</td>
+        </tr>
+        ${cancellationRow}
+        ${cateringRow}
+        ${recurringRow}
+        ${descriptionRow}
+      </table>
+    </div>
+
+    ${infoBox}
+
+    <div style="background:#e0f2fe;padding:15px;border-radius:8px;border-left:4px solid #0284c7;margin:20px 0;">
+      <strong>Bilgi:</strong> ${WIFI_PASSWORD_NOTE}
+    </div>
+
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">
+    <p style="color:#6b7280;font-size:14px;margin-bottom:0;">
+      Bu email Ferko Space Manager tarafindan otomatik olarak gonderilmistir.
+    </p>
+  </div>
+</body>
+</html>`;
+}
+
+function generateEmailText(params: ReservationNotificationRequest): string {
+    const { notificationType, reservation, requester, cancellationReason } = params;
+    const startDate = formatDateTurkish(reservation.startTime);
+    const endDate = formatDateTurkish(reservation.endTime);
+
+    const statusText =
+        notificationType === "pending"
+            ? "onay bekliyor"
+            : notificationType === "cancelled"
+                ? "iptal edildi"
+                : "onaylandi";
+
+    const lines = [
+        `Merhaba,`,
+        ``,
+        `${stripHtml(requester.name)} tarafindan olusturulan bir rezervasyon ${statusText}.`,
+        ``,
+        `Baslik: ${stripHtml(reservation.title)}`,
+        `Oda: ${stripHtml(reservation.roomName)}`,
+        `Baslangic: ${startDate}`,
+        `Bitis: ${endDate}`,
+        `Talep Eden: ${stripHtml(requester.name)} (${stripHtml(requester.email)})`,
+    ];
+
+    if (reservation.cateringRequested) lines.push(`Ikram: Talep Edildi`);
+    if (reservation.isRecurring) lines.push(`Tekrar: ${reservation.recurrencePattern || "Evet"}`);
+    if (reservation.description) lines.push(`Aciklama: ${stripHtml(reservation.description)}`);
+    if (notificationType === "cancelled" && cancellationReason) {
+        lines.push(`Iptal Nedeni: ${stripHtml(cancellationReason)}`);
+    }
+
+    lines.push("", WIFI_PASSWORD_NOTE, "Bu email Ferko Space Manager tarafindan otomatik olarak gonderilmistir.");
+    return lines.join("\n");
 }
 
 serve(async (req) => {
@@ -132,12 +243,18 @@ serve(async (req) => {
 
         const emailHTML = generateEmailHTML(params);
 
-        let subject = `Rezervasyon Onaylandi: ${reservation.title}`;
+        const subjectTitleRaw = stripHtml(reservation.title);
+        const subjectTitle =
+            subjectTitleRaw.length > 80 ? `${subjectTitleRaw.slice(0, 77)}...` : subjectTitleRaw;
+
+        let subject = `Rezervasyon Onaylandi: ${subjectTitle}`;
         if (notificationType === "pending") {
-            subject = `Yeni Rezervasyon Talebi: ${reservation.title}`;
+            subject = `Yeni Rezervasyon Talebi: ${subjectTitle}`;
         } else if (notificationType === "cancelled") {
-            subject = `Rezervasyon Iptal Edildi: ${reservation.title}`;
+            subject = `Rezervasyon Iptal Edildi: ${subjectTitle}`;
         }
+
+        const plainText = generateEmailText(params);
 
         const client = new SMTPClient({
             connection: {
@@ -166,8 +283,18 @@ serve(async (req) => {
                     from: SMTP_USERNAME,
                     to: recipient,
                     subject: subject,
-                    content: "Bu email HTML destekli bir email istemcisi gerektirmektedir.",
-                    html: emailHTML,
+                    mimeContent: [
+                        {
+                            mimeType: 'text/plain; charset="utf-8"',
+                            content: quotedPrintableEncode(plainText),
+                            transferEncoding: "quoted-printable",
+                        },
+                        {
+                            mimeType: 'text/html; charset="utf-8"',
+                            content: quotedPrintableEncode(emailHTML),
+                            transferEncoding: "quoted-printable",
+                        },
+                    ],
                 });
                 results.sent.push(recipient);
                 console.log(`[NOTIFICATION] Email sent to ${recipient}`);

@@ -20,6 +20,9 @@ export function ApprovalActions({ reservationId }: ApprovalActionsProps) {
       const result = await updateReservationStatus(reservationId, "approved");
       if (result.success) {
         toast.success("Rezervasyon onaylandı");
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
         router.refresh();
       } else {
         toast.error(result.error || "Onaylama başarısız");

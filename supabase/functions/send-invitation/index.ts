@@ -1,10 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import {
+  SMTPClient,
+  quotedPrintableEncode,
+} from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const SMTP_HOSTNAME = Deno.env.get("SMTP_HOSTNAME") || "smtp.gmail.com";
 const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "465");
 const SMTP_USERNAME = Deno.env.get("SMTP_USERNAME") || "assembly.bildirim@gmail.com";
 const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD") || "ocho auac jnzv vakf";
+const WIFI_PASSWORD_NOTE = "Assembly Wifi Sifresi: Assembly04*";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,7 +27,7 @@ type InvitationRequest = {
   };
   organizer: {
     name: string;
-    email: string;
+    email?: string;
   };
 };
 
@@ -96,21 +100,28 @@ function formatDateTurkish(dateStr: string): string {
   });
 }
 
-function unescapeHTML(str?: string) {
-  if (!str) return "";
-  return str
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, "&");
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function stripHtml(value?: string): string {
+  if (!value) return "";
+  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function generateEmailHTML(params: InvitationRequest): string {
   const { reservation, organizer } = params;
-
-  // Ensure description is treated as HTML, not text
-  const descriptionHtml = unescapeHTML(reservation.description);
+  const safeTitle = escapeHtml(stripHtml(reservation.title));
+  const safeRoomName = escapeHtml(stripHtml(reservation.roomName));
+  const safeOrganizerName = escapeHtml(stripHtml(organizer.name));
+  const safeDescription = escapeHtml(stripHtml(reservation.description));
+  const startDate = formatDateTurkish(reservation.startTime);
+  const endDate = formatDateTurkish(reservation.endTime);
 
   return `<!DOCTYPE html>
 <html lang="tr">
@@ -126,28 +137,28 @@ function generateEmailHTML(params: InvitationRequest): string {
   <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
     <p style="margin-top: 0;">Merhaba,</p>
 
-    <p><strong>${organizer.name}</strong> sizi bir toplantiya davet etti.</p>
+    <p><strong>${safeOrganizerName}</strong> sizi bir toplantiya davet etti.</p>
 
     <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb; margin: 20px 0;">
-      <h2 style="margin-top: 0; color: #4f46e5; font-size: 18px;">${reservation.title}</h2>
+      <h2 style="margin-top: 0; color: #4f46e5; font-size: 18px;">${safeTitle}</h2>
 
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 8px 0; color: #6b7280; width: 100px;">Oda:</td>
-          <td style="padding: 8px 0; font-weight: 500;">${reservation.roomName}</td>
+          <td style="padding: 8px 0; font-weight: 500;">${safeRoomName}</td>
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #6b7280;">Baslangic:</td>
-          <td style="padding: 8px 0; font-weight: 500;">${formatDateTurkish(reservation.startTime)}</td>
+          <td style="padding: 8px 0; font-weight: 500;">${startDate}</td>
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #6b7280;">Bitis:</td>
-          <td style="padding: 8px 0; font-weight: 500;">${formatDateTurkish(reservation.endTime)}</td>
+          <td style="padding: 8px 0; font-weight: 500;">${endDate}</td>
         </tr>
-        ${descriptionHtml ? `
+        ${safeDescription ? `
         <tr>
           <td style="padding: 8px 0; color: #6b7280; vertical-align: top;">Aciklama:</td>
-          <td style="padding: 8px 0;">${descriptionHtml}</td>
+          <td style="padding: 8px 0; white-space: pre-wrap;">${safeDescription}</td>
         </tr>
         ` : ""}
       </table>
@@ -155,6 +166,10 @@ function generateEmailHTML(params: InvitationRequest): string {
 
     <p style="background: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
       <strong>Not:</strong> Takvim uygulamanizda etkinligi eklemek icin ekteki davet.ics dosyasini acin.
+    </p>
+
+    <p style="background: #e0f2fe; padding: 15px; border-radius: 8px; border-left: 4px solid #0284c7; margin: 20px 0;">
+      <strong>Bilgi:</strong> ${WIFI_PASSWORD_NOTE}
     </p>
 
     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
@@ -165,6 +180,30 @@ function generateEmailHTML(params: InvitationRequest): string {
   </div>
 </body>
 </html>`;
+}
+
+function generateEmailText(params: InvitationRequest): string {
+  const { reservation, organizer } = params;
+  const lines = [
+    "Merhaba,",
+    "",
+    `${stripHtml(organizer.name)} sizi bir toplantiya davet etti.`,
+    "",
+    `Baslik: ${stripHtml(reservation.title)}`,
+    `Oda: ${stripHtml(reservation.roomName)}`,
+    `Baslangic: ${formatDateTurkish(reservation.startTime)}`,
+    `Bitis: ${formatDateTurkish(reservation.endTime)}`,
+  ];
+
+  if (reservation.description) {
+    lines.push(`Aciklama: ${stripHtml(reservation.description)}`);
+  }
+
+  lines.push("", "Takvim uygulamanizda etkinligi eklemek icin ekteki davet.ics dosyasini acin.");
+  lines.push(WIFI_PASSWORD_NOTE);
+  lines.push("Bu email Ferko Space Manager tarafindan otomatik olarak gonderilmistir.");
+
+  return lines.join("\n");
 }
 
 serve(async (req) => {
@@ -178,12 +217,16 @@ serve(async (req) => {
     const { to, reservation, organizer } = params;
 
     // Validate required fields
-    if (!to || !reservation?.id || !reservation?.title || !organizer?.email) {
+    if (!to || !reservation?.id || !reservation?.title) {
       return new Response(
         JSON.stringify({ success: false, error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const recipientEmail = stripHtml(to).trim().toLowerCase();
+    const organizerEmail = stripHtml(organizer?.email).trim().toLowerCase() || SMTP_USERNAME;
+    const organizerName = stripHtml(organizer?.name) || "Assembly Space";
 
     // Check SMTP configuration
     if (!SMTP_USERNAME || !SMTP_PASSWORD) {
@@ -197,18 +240,22 @@ serve(async (req) => {
     // Generate ICS content
     const icsContent = generateICS({
       uid: `${reservation.id}@ferko-space-manager.com`,
-      title: reservation.title,
-      description: reservation.description,
+      title: stripHtml(reservation.title),
+      description: stripHtml(reservation.description),
       startTime: reservation.startTime,
       endTime: reservation.endTime,
-      location: `Ferko - ${reservation.roomName}`,
-      organizerEmail: organizer.email,
-      organizerName: organizer.name,
-      attendeeEmail: to,
+      location: `Ferko - ${stripHtml(reservation.roomName)}`,
+      organizerEmail,
+      organizerName,
+      attendeeEmail: recipientEmail,
     });
 
     // Generate email HTML
     const emailHTML = generateEmailHTML(params);
+    const plainText = generateEmailText(params);
+    const subjectTitleRaw = stripHtml(reservation.title);
+    const subjectTitle =
+      subjectTitleRaw.length > 80 ? `${subjectTitleRaw.slice(0, 77)}...` : subjectTitleRaw;
 
     // Create SMTP client
     const client = new SMTPClient({
@@ -226,10 +273,20 @@ serve(async (req) => {
     // Send email with proper calendar attachment
     await client.send({
       from: SMTP_USERNAME,
-      to: to,
-      subject: `Toplanti Daveti: ${reservation.title}`,
-      content: "Takvim davetiniz HTML destekli bir email istemcisi gerektirmektedir.",
-      html: emailHTML,
+      to: recipientEmail,
+      subject: `Toplanti Daveti: ${subjectTitle}`,
+      mimeContent: [
+        {
+          mimeType: 'text/plain; charset="utf-8"',
+          content: quotedPrintableEncode(plainText),
+          transferEncoding: "quoted-printable",
+        },
+        {
+          mimeType: 'text/html; charset="utf-8"',
+          content: quotedPrintableEncode(emailHTML),
+          transferEncoding: "quoted-printable",
+        },
+      ],
       attachments: [
         {
           filename: "davet.ics",

@@ -1,5 +1,7 @@
 "use server";
 
+import { invokeSupabaseFunction } from "@/lib/email/invoke-supabase-function";
+
 type NotificationType = "pending" | "approved" | "cancelled";
 
 type ReservationNotificationParams = {
@@ -29,46 +31,48 @@ type ReservationNotificationResult = {
     error?: string;
 };
 
+type SendReservationNotificationOptions = {
+    accessToken?: string;
+};
+
 export async function sendReservationNotification(
-    params: ReservationNotificationParams
+    params: ReservationNotificationParams,
+    options?: SendReservationNotificationOptions
 ): Promise<ReservationNotificationResult> {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-    if (!supabaseUrl) {
-        console.error("Supabase URL not configured");
-        return { success: false, error: "Supabase URL not configured" };
-    }
-
-    const functionUrl = `${supabaseUrl}/functions/v1/send-reservation-notification`;
-
     try {
-        const response = await fetch(functionUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(params),
-        });
+        const { data, error } = await invokeSupabaseFunction<{
+            success?: boolean;
+            sent?: string[];
+            failed?: string[];
+            error?: string;
+        }>("send-reservation-notification", params, options);
 
-        const result = await response.json();
-
-        if (!response.ok) {
-            console.error("Failed to send reservation notification:", result);
+        if (error) {
+            console.error("Failed to send reservation notification:", error);
             return {
                 success: false,
-                error: result.error || "Failed to send notification"
+                error,
             };
         }
 
-        console.log(`[RESERVATION NOTIFICATION] Sent to: ${result.sent?.join(", ") || "none"}`);
-        if (result.failed?.length > 0) {
-            console.warn(`[RESERVATION NOTIFICATION] Failed for: ${result.failed.join(", ")}`);
+        if (!data?.success) {
+            return {
+                success: false,
+                error: data?.error || "Failed to send notification",
+            };
+        }
+
+        const failedRecipients = data.failed ?? [];
+
+        console.log(`[RESERVATION NOTIFICATION] Sent to: ${data.sent?.join(", ") || "none"}`);
+        if (failedRecipients.length > 0) {
+            console.warn(`[RESERVATION NOTIFICATION] Failed for: ${failedRecipients.join(", ")}`);
         }
 
         return {
             success: true,
-            sent: result.sent,
-            failed: result.failed,
+            sent: data.sent,
+            failed: failedRecipients,
         };
     } catch (error) {
         console.error("Error calling reservation notification function:", error);

@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { invokeSupabaseFunction } from "@/lib/email/invoke-supabase-function";
 
 export type SendCancellationParams = {
   to: string;
@@ -23,19 +23,32 @@ export type SendCancellationResult = {
   error?: string;
 };
 
+type SendCancellationOptions = {
+  accessToken?: string;
+};
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export async function sendCancellationEmail(
-  params: SendCancellationParams
+  params: SendCancellationParams,
+  options?: SendCancellationOptions
 ): Promise<SendCancellationResult> {
   try {
-    const supabase = await createClient();
-
-    const { data, error } = await supabase.functions.invoke("send-cancellation", {
-      body: params,
-    });
+    const { data, error } = await invokeSupabaseFunction<{ success?: boolean; error?: string }>(
+      "send-cancellation",
+      params,
+      options
+    );
 
     if (error) {
       console.error("Error invoking send-cancellation function:", error);
-      return { success: false, error: error.message };
+      return { success: false, error };
     }
 
     if (data && !data.success) {
@@ -53,17 +66,25 @@ export async function sendCancellationEmail(
 export async function sendCancellationEmails(
   attendees: string[],
   reservation: SendCancellationParams["reservation"],
-  organizer: SendCancellationParams["organizer"]
+  organizer: SendCancellationParams["organizer"],
+  options?: SendCancellationOptions
 ): Promise<{ sent: string[]; failed: string[] }> {
   const sent: string[] = [];
   const failed: string[] = [];
+  const uniqueAttendees = Array.from(new Set(attendees.map(normalizeEmail)));
 
-  for (const email of attendees) {
+  for (const email of uniqueAttendees) {
+    if (!isValidEmail(email)) {
+      failed.push(email);
+      console.error(`[CANCELLATION] Invalid email skipped: ${email}`);
+      continue;
+    }
+
     const result = await sendCancellationEmail({
       to: email,
       reservation,
       organizer,
-    });
+    }, options);
 
     if (result.success) {
       sent.push(email);

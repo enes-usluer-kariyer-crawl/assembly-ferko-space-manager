@@ -24,6 +24,9 @@ export function CancelReservationButton({ reservationId }: CancelReservationButt
         toast.error(result.message || "Rezervasyon iptal edilirken bir hata oluştu.");
       } else {
         toast.success(result.message || "Rezervasyon başarıyla iptal edildi.");
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
       }
     } catch (error) {
       console.error("Cancel reservation error:", error);

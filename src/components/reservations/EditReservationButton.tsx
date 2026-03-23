@@ -10,6 +10,7 @@ type EditButtonProps = {
         id: string;
         title: string;
         description?: string | null;
+        team?: string;
         start_time: string;
         end_time: string;
         room_id: string;

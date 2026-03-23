@@ -31,6 +31,7 @@ type ReservationDetailDialogProps = {
       roomName: string;
       roomId: string;
       status: string;
+      team?: string;
       description: string | null;
       tags?: string[];
       cateringRequested?: boolean;
@@ -149,6 +150,9 @@ export function ReservationDetailDialog({
       const result = await cancelReservation(realReservationId);
       if (result.success) {
         toast.success(result.message || "Rezervasyon iptal edildi.");
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
         onOpenChange(false);
         onCancelled?.();
       } else {
@@ -168,6 +172,9 @@ export function ReservationDetailDialog({
       const result = await cancelRecurringInstance(realReservationId, event.start.toISOString());
       if (result.success) {
         toast.success(result.message || "Bu tarih için rezervasyon iptal edildi.");
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
         onOpenChange(false);
         onCancelled?.();
       } else {
@@ -187,6 +194,9 @@ export function ReservationDetailDialog({
       const result = await cancelReservation(realReservationId);
       if (result.success) {
         toast.success(result.message || "Tüm haftalık rezervasyonlar iptal edildi.");
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
         onOpenChange(false);
         onCancelled?.();
       } else {
@@ -219,6 +229,14 @@ export function ReservationDetailDialog({
               <MapPin className="h-5 w-5 flex-shrink-0" />
               <span className="font-medium text-foreground">{event.resource.roomName}</span>
             </div>
+
+            {/* Team */}
+            {event.resource.team && (
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <User className="h-5 w-5 flex-shrink-0" />
+                <span className="font-medium text-foreground">{event.resource.team}</span>
+              </div>
+            )}
 
             {/* Time */}
             <div className="flex items-start gap-3 text-muted-foreground">
@@ -321,6 +339,7 @@ export function ReservationDetailDialog({
                     id: realReservationId,
                     title: event.title.replace(` (${event.resource.roomName})`, ""),
                     description: event.resource.description,
+                    team: event.resource.team,
                     start_time: event.start.toISOString(),
                     end_time: event.end.toISOString(),
                     room_id: event.resource.roomId,

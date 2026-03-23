@@ -32,6 +32,7 @@ import { EmailAutocomplete } from "@/components/ui/email-autocomplete";
 import { updateReservation, type Room } from "@/lib/actions/reservations";
 import { BIG_EVENT_TAGS } from "@/constants/events";
 import { ROOM_CAPACITIES } from "@/constants/rooms";
+import { TEAM_OPTIONS, type TeamName } from "@/constants/teams";
 
 
 
@@ -40,6 +41,7 @@ type EditReservationDialogProps = {
         id: string;
         title: string;
         description?: string | null;
+        team?: string;
         start_time: string;
         end_time: string;
         room_id: string;
@@ -57,6 +59,11 @@ type EditReservationDialogProps = {
     onSuccess?: () => void;
 };
 
+function normalizeTeam(value?: string): TeamName | "" {
+    if (!value) return "";
+    return TEAM_OPTIONS.includes(value as TeamName) ? (value as TeamName) : "";
+}
+
 export function EditReservationDialog({
     reservation,
     rooms,
@@ -71,6 +78,7 @@ export function EditReservationDialog({
     // Form state
     const [title, setTitle] = useState(reservation.title);
     const [description, setDescription] = useState(reservation.description || "");
+    const [team, setTeam] = useState<TeamName | "">(normalizeTeam(reservation.team));
     const [roomId, setRoomId] = useState(reservation.room_id);
     const [startDate, setStartDate] = useState("");
     const [startTime, setStartTime] = useState("");
@@ -99,6 +107,7 @@ export function EditReservationDialog({
 
             setTitle(reservation.title);
             setDescription(reservation.description || "");
+            setTeam(normalizeTeam(reservation.team));
             setRoomId(reservation.room_id);
             setStartDate(format(start, "yyyy-MM-dd"));
             setStartTime(format(start, "HH:mm"));
@@ -212,6 +221,11 @@ export function EditReservationDialog({
             return;
         }
 
+        if (!team) {
+            setError("Lütfen bir ekip seçin.");
+            return;
+        }
+
         if (!startDate || !startTime || !endDate || !endTime) {
             setError("Tarih ve saat bilgileri gereklidir.");
             return;
@@ -231,6 +245,7 @@ export function EditReservationDialog({
         try {
             const result = await updateReservation({
                 id: reservation.id,
+                team,
                 title: title.trim(),
                 description: description?.trim() || undefined,
                 startTime: startLocal.toISOString(),
@@ -328,6 +343,23 @@ export function EditReservationDialog({
                                 </button>
                             )}
                         </div>
+                    </div>
+
+                    {/* Room */}
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-team">Ekip *</Label>
+                        <Select value={team} onValueChange={(value) => setTeam(value as TeamName)}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Ekip seçin" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {TEAM_OPTIONS.map((teamOption) => (
+                                    <SelectItem key={teamOption} value={teamOption}>
+                                        {teamOption}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     {/* Room */}

@@ -124,6 +124,7 @@ export function ReportsClient({ rooms, initialStats }: ReportsClientProps) {
             ["İptal Oranı", stats.totalReservations > 0 ? `%${((stats.cancelledCount / stats.totalReservations) * 100).toFixed(1)}` : "%0"],
             ["Toplam Kullanım (Saat)", stats.totalHours.toFixed(1)],
             ["Aktif Kullanıcı Sayısı", Object.keys(stats.byUser).length],
+            ["Ekip Sayısı", Object.keys(stats.byTeam).length],
             ["Şirket Etkinlikleri", stats.companyEventCount],
             ["Üniversite Etkinlikleri", stats.universityEventCount],
             ["Exco Toplantıları", stats.excoEventCount],
@@ -159,12 +160,26 @@ export function ReportsClient({ rooms, initialStats }: ReportsClientProps) {
         const wsUsers = XLSX.utils.aoa_to_sheet(userData);
         XLSX.utils.book_append_sheet(wb, wsUsers, "Kullanıcı İstatistikleri");
 
-        // 4. Detailed Reservations
+        // 4. Team Sheet
+        const teamData = [
+            ["Ekip", "Rezervasyon Sayısı", "Toplam Süre (Saat)", "Toplam Gün"],
+            ...Object.values(stats.byTeam).map((team) => [
+                team.name,
+                team.count,
+                team.hours.toFixed(1),
+                team.totalDays,
+            ]),
+        ];
+        const wsTeams = XLSX.utils.aoa_to_sheet(teamData);
+        XLSX.utils.book_append_sheet(wb, wsTeams, "Ekip İstatistikleri");
+
+        // 5. Detailed Reservations
         const detailsData = [
-            ["ID", "Başlık", "Oda", "Başlangıç Tarihi", "Bitiş Tarihi", "Talep Eden", "Email", "Durum", "Etkinlik Tipi", "Tekrar", "İkram"],
+            ["ID", "Başlık", "Ekip", "Oda", "Başlangıç Tarihi", "Bitiş Tarihi", "Talep Eden", "Email", "Durum", "Etkinlik Tipi", "Tekrar", "İkram"],
             ...(stats.allReservations?.map((r: any) => [
                 r.id,
                 r.title,
+                r.team || "Belirtilmedi",
                 r.room?.name || "Silinmiş Oda",
                 new Date(r.start_time).toLocaleString("tr-TR"),
                 new Date(r.end_time).toLocaleString("tr-TR"),
@@ -187,6 +202,7 @@ export function ReportsClient({ rooms, initialStats }: ReportsClientProps) {
     // Prepare view data
     const roomStats = Object.values(stats.byRoom).sort((a, b) => b.hours - a.hours);
     const userStats = Object.values(stats.byUser).sort((a, b) => b.count - a.count).slice(0, 10);
+    const teamStats = Object.values(stats.byTeam).sort((a, b) => b.totalDays - a.totalDays);
 
     return (
         <div className="flex-1 space-y-8 p-8 pt-6">
@@ -443,6 +459,41 @@ export function ReportsClient({ rooms, initialStats }: ReportsClientProps) {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Team Stats */}
+            <Card className={cn(loading && "opacity-60 pointer-events-none")}>
+                <CardHeader>
+                    <CardTitle>Ekip İstatistikleri</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="relative w-full overflow-auto">
+                        <table className="w-full caption-bottom text-sm">
+                            <thead className="[&_tr]:border-b">
+                                <tr className="border-b transition-colors hover:bg-muted/50">
+                                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Ekip</th>
+                                    <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Rezervasyon</th>
+                                    <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Toplam Saat</th>
+                                    <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Toplam Gün</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {teamStats.length > 0 ? teamStats.map((team) => (
+                                    <tr key={team.name} className="border-b transition-colors hover:bg-muted/50">
+                                        <td className="p-4 align-middle font-medium">{team.name}</td>
+                                        <td className="p-4 align-middle text-right">{team.count}</td>
+                                        <td className="p-4 align-middle text-right">{team.hours.toFixed(1)}</td>
+                                        <td className="p-4 align-middle text-right">{team.totalDays}</td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan={4} className="p-4 text-center text-muted-foreground">Ekip verisi bulunamadı</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Recent Activity Log */}
             <Card className={cn(loading && "opacity-60")}>
