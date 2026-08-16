@@ -8,6 +8,7 @@ export const TEAM_OPTIONS = [
   "Technology&Innovation",
   "Product Management&Marketing",
   "Exco",
+  "WeConsulting",
 ] as const;
 
 export const LEGACY_TEAM_LABEL = "Belirtilmedi" as const;
