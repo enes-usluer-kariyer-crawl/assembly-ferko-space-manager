@@ -64,10 +64,11 @@ export function ReportsClient({ rooms, initialStats }: ReportsClientProps) {
 
             setLoading(true);
             try {
-                const start = new Date(dateRange.start);
-                const end = new Date(dateRange.end);
+                // Parse as local time; a bare "yyyy-MM-dd" is parsed as UTC midnight,
+                // which would drop reservations between 00:00 and 03:00 on the first day
+                const start = new Date(`${dateRange.start}T00:00:00`);
                 // End date should include the full day
-                end.setHours(23, 59, 59, 999);
+                const end = new Date(`${dateRange.end}T23:59:59.999`);
 
                 const data = await getReportStats({
                     startDate: start,

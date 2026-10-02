@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { BIG_EVENT_TAGS } from "@/constants/events";
+import { getOccurrencesInRange, getOccurrenceDayKey } from "@/lib/recurrence";
 
 export type ReportStats = {
   totalReservations: number;
@@ -42,44 +43,107 @@ export async function getReportStats(filters: ReportFilters = {}): Promise<Repor
 
   const start = filters.startDate || new Date(new Date().setDate(end.getDate() - 30));
 
-  let query = supabase
-    .from("reservations")
-    .select(`
+  const reservationSelect = `
       *,
       room:rooms(id, name),
       user:profiles!reservations_user_id_fkey(id, email, full_name)
-    `)
+    `;
+
+  let query = supabase
+    .from("reservations")
+    .select(reservationSelect)
     .gte("start_time", start.toISOString())
     .lte("start_time", end.toISOString())
     .not("tags", "cs", '{"big_event_block"}') // Exclude system blocks
     .order("created_at", { ascending: false });
+
+  // Active recurring series are stored as a single parent row, so they are fetched
+  // regardless of the range and expanded into their occurrences below
+  let seriesQuery = supabase
+    .from("reservations")
+    .select(reservationSelect)
+    .eq("is_recurring", true)
+    .neq("recurrence_pattern", "none")
+    .is("parent_reservation_id", null)
+    .in("status", ["pending", "approved"])
+    .lte("start_time", end.toISOString())
+    .not("tags", "cs", '{"big_event_block"}');
+
   if (filters.roomIds && filters.roomIds.length > 0) {
     query = query.in("room_id", filters.roomIds);
+    seriesQuery = seriesQuery.in("room_id", filters.roomIds);
   }
 
   // Parallel fetch: Filtered stats AND Global recent activity
-  const [statsResult, recentResult] = await Promise.all([
+  const [statsResult, seriesResult, recentResult] = await Promise.all([
     query,
+    seriesQuery,
     supabase
       .from("reservations")
-      .select(`
-        *,
-        room:rooms(id, name),
-        user:profiles!reservations_user_id_fkey(id, email, full_name)
-      `)
+      .select(reservationSelect)
       .not("tags", "cs", '{"big_event_block"}')
       .order("updated_at", { ascending: false })
       .limit(10)
   ]);
 
-  const reservations = statsResult.data || [];
   const recentLogs = recentResult.data || [];
-  const error = statsResult.error || recentResult.error;
+  const error = statsResult.error || seriesResult.error || recentResult.error;
 
   if (error) {
     console.error("Error fetching report stats:", error);
     throw new Error("Rapor verileri alınamadı");
   }
+
+  const series = seriesResult.data || [];
+  const seriesIds = new Set(series.map((s) => s.id));
+
+  // Single instances cancelled from a series are stored as child rows; they replace
+  // the matching occurrence instead of being counted on top of it
+  const exceptionStatusByKey = new Map<string, string>();
+  if (seriesIds.size > 0) {
+    const { data: exceptions, error: exceptionsError } = await supabase
+      .from("reservations")
+      .select("parent_reservation_id, start_time, status")
+      .in("parent_reservation_id", [...seriesIds]);
+
+    if (exceptionsError) {
+      console.error("Error fetching recurring exceptions:", exceptionsError);
+      throw new Error("Rapor verileri alınamadı");
+    }
+
+    (exceptions || []).forEach((ex) => {
+      exceptionStatusByKey.set(`${ex.parent_reservation_id}|${getOccurrenceDayKey(ex.start_time)}`, ex.status);
+    });
+  }
+
+  const expandedOccurrences = series.flatMap((parent) =>
+    getOccurrencesInRange(parent, start, end)
+      // Same rule as standalone reservations: the occurrence must start within the range
+      .filter((occurrence) => occurrence.start >= start)
+      .map((occurrence) => {
+        const exceptionStatus = exceptionStatusByKey.get(`${parent.id}|${getOccurrenceDayKey(occurrence.start)}`);
+        return {
+          ...parent,
+          id: occurrence.index === 0 ? parent.id : `${parent.id}_${parent.recurrence_pattern}${occurrence.index}`,
+          start_time: occurrence.start.toISOString(),
+          end_time: occurrence.end.toISOString(),
+          parent_reservation_id: occurrence.index === 0 ? null : parent.id,
+          status: exceptionStatus ?? parent.status,
+        };
+      })
+  );
+
+  const reservations = [
+    // Series parents and their exception rows are represented by the expanded occurrences
+    ...(statsResult.data || []).filter(
+      (res) => !seriesIds.has(res.id) && !seriesIds.has(res.parent_reservation_id)
+    ),
+    ...expandedOccurrences,
+  ].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime() ||
+      new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+  );
 
   // Initialize stats
   const stats: ReportStats = {

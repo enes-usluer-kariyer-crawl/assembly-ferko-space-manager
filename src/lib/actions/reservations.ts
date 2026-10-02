@@ -7,6 +7,7 @@ import { ROOM_CAPACITIES, COMBINED_ROOMS } from "@/constants/rooms";
 import { sendTeamsReservationAlert } from "@/lib/notifications/teams";
 import { BIG_EVENT_TAGS, BIG_EVENT_BLOCK_LABEL } from "@/constants/events";
 import { type ReservationTeam, isValidReservationTeam } from "@/constants/teams";
+import { getOccurrencesInRange, getOccurrenceDayKey } from "@/lib/recurrence";
 
 
 async function getAccessTokenForFunctionCalls(
@@ -88,6 +89,30 @@ export type GetReservationsParams = {
   endDate?: string;
   roomId?: string;
 };
+
+// Single instances cancelled from a recurring series are stored as cancelled child rows.
+// Returns "parentId|YYYY-MM-DD" keys so the expanded instance can be skipped.
+async function getCancelledInstanceKeys(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  parentIds: string[]
+): Promise<Set<string>> {
+  if (parentIds.length === 0) return new Set();
+
+  const { data, error } = await supabase
+    .from("reservations")
+    .select("parent_reservation_id, start_time")
+    .in("parent_reservation_id", parentIds)
+    .in("status", ["cancelled", "rejected"]);
+
+  if (error) {
+    console.error("Error fetching cancelled recurring instances:", error);
+    return new Set();
+  }
+
+  return new Set(
+    (data ?? []).map((row) => `${row.parent_reservation_id}|${getOccurrenceDayKey(row.start_time)}`)
+  );
+}
 
 export async function getReservations(params?: GetReservationsParams): Promise<{
   success: boolean;
@@ -175,73 +200,35 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
   const viewStart = params?.startDate ? new Date(params.startDate) : defaultViewStart;
   const viewEnd = params?.endDate ? new Date(params.endDate) : defaultViewEnd;
 
+  const cancelledInstanceKeys = await getCancelledInstanceKeys(
+    supabase,
+    baseReservations
+      .filter((r) => r.is_recurring && r.recurrence_pattern !== "none")
+      .map((r) => r.id)
+  );
+
   for (const reservation of baseReservations) {
     const pattern = reservation.recurrence_pattern;
 
     // Check if this is a recurring event
     if (reservation.is_recurring && pattern !== "none") {
-      const originalStart = new Date(reservation.start_time);
-      const originalEnd = new Date(reservation.end_time);
-      const duration = originalEnd.getTime() - originalStart.getTime();
-
-      // Determine the recurrence end condition
-      const endType = reservation.recurrence_end_type || "never";
-      const maxCount = reservation.recurrence_count || 52;
-      const endDate = reservation.recurrence_end_date ? new Date(reservation.recurrence_end_date) : null;
-
-      // Add the original event if it falls within the range
-      if (originalStart <= viewEnd && originalEnd >= viewStart) {
-        expandedReservations.push(reservation);
-      }
-
-      // Helper function to get next occurrence date
-      const getNextOccurrence = (baseDate: Date, occurrence: number): Date => {
-        const nextDate = new Date(baseDate);
-        switch (pattern) {
-          case "daily":
-            nextDate.setDate(nextDate.getDate() + occurrence);
-            break;
-          case "weekly":
-            nextDate.setDate(nextDate.getDate() + (occurrence * 7));
-            break;
-          case "biweekly":
-            nextDate.setDate(nextDate.getDate() + (occurrence * 14));
-            break;
-          case "monthly":
-            nextDate.setMonth(nextDate.getMonth() + occurrence);
-            break;
+      for (const occurrence of getOccurrencesInRange(reservation, viewStart, viewEnd)) {
+        // Skip single instances that were cancelled from the series
+        if (cancelledInstanceKeys.has(`${reservation.id}|${getOccurrenceDayKey(occurrence.start)}`)) {
+          continue;
         }
-        return nextDate;
-      };
 
-      // Maximum iterations to prevent infinite loops
-      const maxIterations = pattern === "daily" ? 365 : pattern === "monthly" ? 24 : 52;
-      let occurrence = 1;
-      let generatedCount = 1; // Original event counts as 1
-
-      while (occurrence <= maxIterations) {
-        const instanceStart = getNextOccurrence(originalStart, occurrence);
-
-        // Check end conditions
-        if (endType === "count" && generatedCount >= maxCount) break;
-        if (endType === "date" && endDate && instanceStart > endDate) break;
-        if (instanceStart > viewEnd) break;
-
-        const instanceEnd = new Date(instanceStart.getTime() + duration);
-
-        // Include if instance overlaps with view range
-        if (instanceEnd >= viewStart) {
+        if (occurrence.index === 0) {
+          expandedReservations.push(reservation);
+        } else {
           expandedReservations.push({
             ...reservation,
-            id: `${reservation.id}_${pattern}${occurrence}`,
-            start_time: instanceStart.toISOString(),
-            end_time: instanceEnd.toISOString(),
+            id: `${reservation.id}_${pattern}${occurrence.index}`,
+            start_time: occurrence.start.toISOString(),
+            end_time: occurrence.end.toISOString(),
             parent_reservation_id: reservation.id,
           });
-          generatedCount++;
         }
-
-        occurrence++;
       }
     } else {
       // Non-recurring event - include all
