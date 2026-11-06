@@ -7,7 +7,7 @@ import { ROOM_CAPACITIES, COMBINED_ROOMS } from "@/constants/rooms";
 import { sendTeamsReservationAlert } from "@/lib/notifications/teams";
 import { BIG_EVENT_TAGS, BIG_EVENT_BLOCK_LABEL } from "@/constants/events";
 import { type ReservationTeam, isValidReservationTeam } from "@/constants/teams";
-import { getOccurrencesInRange, getOccurrenceDayKey } from "@/lib/recurrence";
+import { getOccurrencesInRange, getInstanceKey, getCancelledInstanceKeys } from "@/lib/recurrence";
 
 
 async function getAccessTokenForFunctionCalls(
@@ -89,30 +89,6 @@ export type GetReservationsParams = {
   endDate?: string;
   roomId?: string;
 };
-
-// Single instances cancelled from a recurring series are stored as cancelled child rows.
-// Returns "parentId|YYYY-MM-DD" keys so the expanded instance can be skipped.
-async function getCancelledInstanceKeys(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  parentIds: string[]
-): Promise<Set<string>> {
-  if (parentIds.length === 0) return new Set();
-
-  const { data, error } = await supabase
-    .from("reservations")
-    .select("parent_reservation_id, start_time")
-    .in("parent_reservation_id", parentIds)
-    .in("status", ["cancelled", "rejected"]);
-
-  if (error) {
-    console.error("Error fetching cancelled recurring instances:", error);
-    return new Set();
-  }
-
-  return new Set(
-    (data ?? []).map((row) => `${row.parent_reservation_id}|${getOccurrenceDayKey(row.start_time)}`)
-  );
-}
 
 export async function getReservations(params?: GetReservationsParams): Promise<{
   success: boolean;
@@ -214,7 +190,7 @@ export async function getReservations(params?: GetReservationsParams): Promise<{
     if (reservation.is_recurring && pattern !== "none") {
       for (const occurrence of getOccurrencesInRange(reservation, viewStart, viewEnd)) {
         // Skip single instances that were cancelled from the series
-        if (cancelledInstanceKeys.has(`${reservation.id}|${getOccurrenceDayKey(occurrence.start)}`)) {
+        if (cancelledInstanceKeys.has(getInstanceKey(reservation.id, occurrence.start))) {
           continue;
         }
 
@@ -1507,6 +1483,84 @@ export async function cancelRecurringInstance(
     }
   }
 
+  // Big Events lock the other rooms through separate recurring "big_event_block" series
+  // (created with a 30-minute buffer). Cancel the same day in those series as well,
+  // otherwise the office stays blocked on the cancelled day.
+  let blockWarning: string | undefined;
+  if (isBigEventRequest(parentReservation.tags ?? [])) {
+    const bufferMs = 30 * 60 * 1000;
+    const { data: blockSeries, error: blockSeriesError } = await supabase
+      .from("reservations")
+      .select("id, room_id, user_id, team, title, description, tags")
+      .contains("tags", ["big_event_block"])
+      .eq("is_recurring", true)
+      .is("parent_reservation_id", null)
+      .in("status", ["pending", "approved"])
+      .eq("start_time", new Date(originalStart.getTime() - bufferMs).toISOString())
+      .eq("end_time", new Date(originalEnd.getTime() + bufferMs).toISOString());
+
+    let blockCancelFailed = !!blockSeriesError;
+    if (blockSeriesError) {
+      console.error("Error fetching Big Event block series:", blockSeriesError);
+    } else if (blockSeries && blockSeries.length > 0) {
+      const blockStart = new Date(instanceStart.getTime() - bufferMs).toISOString();
+      const blockEnd = new Date(instanceEnd.getTime() + bufferMs).toISOString();
+
+      const { data: existingBlockExceptions } = await supabase
+        .from("reservations")
+        .select("id, parent_reservation_id, status")
+        .in("parent_reservation_id", blockSeries.map((block) => block.id))
+        .eq("start_time", blockStart);
+
+      const existingExceptions = existingBlockExceptions ?? [];
+      const seriesWithException = new Set(existingExceptions.map((row) => row.parent_reservation_id));
+      const activeExceptionIds = existingExceptions
+        .filter((row) => row.status !== "cancelled" && row.status !== "rejected")
+        .map((row) => row.id);
+
+      if (activeExceptionIds.length > 0) {
+        const { error } = await supabase
+          .from("reservations")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .in("id", activeExceptionIds);
+        if (error) {
+          console.error("Error cancelling Big Event block exceptions:", error);
+          blockCancelFailed = true;
+        }
+      }
+
+      const newBlockExceptions = blockSeries
+        .filter((block) => !seriesWithException.has(block.id))
+        .map((block) => ({
+          room_id: block.room_id,
+          user_id: block.user_id,
+          team: block.team,
+          title: block.title,
+          description: block.description,
+          start_time: blockStart,
+          end_time: blockEnd,
+          status: "cancelled",
+          tags: block.tags ?? [],
+          catering_requested: false,
+          is_recurring: false,
+          recurrence_pattern: "none",
+          parent_reservation_id: block.id,
+        }));
+
+      if (newBlockExceptions.length > 0) {
+        const { error } = await supabase.from("reservations").insert(newBlockExceptions);
+        if (error) {
+          console.error("Error creating Big Event block exceptions:", error);
+          blockCancelFailed = true;
+        }
+      }
+    }
+
+    if (blockCancelFailed) {
+      blockWarning = "Diğer odalardaki Büyük Etkinlik blokları bu gün için kaldırılamadı, odalar bloklu görünebilir.";
+    }
+  }
+
   const rawProfiles = parentReservation.profiles as unknown;
   const organizerProfile = (Array.isArray(rawProfiles) ? rawProfiles[0] : rawProfiles) as
     | { full_name: string | null; email: string }
@@ -1568,7 +1622,7 @@ export async function cancelRecurringInstance(
   return {
     success: true,
     message: "Seçilen tarih için rezervasyon başarıyla iptal edildi.",
-    warning: cancellationWarning,
+    warning: [blockWarning, cancellationWarning].filter(Boolean).join(" ") || undefined,
   };
 }
 

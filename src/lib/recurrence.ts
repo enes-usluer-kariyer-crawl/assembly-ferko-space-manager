@@ -1,3 +1,7 @@
+import type { createClient } from "@/lib/supabase/server";
+
+type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
 export type RecurrenceSource = {
   start_time: string;
   end_time: string;
@@ -26,6 +30,33 @@ const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", {
 // Calendar day (Istanbul) of an occurrence, used to match cancelled exception rows to their instance
 export function getOccurrenceDayKey(date: Date | string): string {
   return dayKeyFormatter.format(new Date(date));
+}
+
+// Identifies one occurrence of a series: "parentId|YYYY-MM-DD"
+export function getInstanceKey(parentId: string, date: Date | string): string {
+  return `${parentId}|${getOccurrenceDayKey(date)}`;
+}
+
+// Single instances cancelled from a recurring series are stored as cancelled child rows.
+// Returns their instance keys so the matching expanded occurrence can be skipped.
+export async function getCancelledInstanceKeys(
+  supabase: ServerSupabaseClient,
+  parentIds: string[]
+): Promise<Set<string>> {
+  if (parentIds.length === 0) return new Set();
+
+  const { data, error } = await supabase
+    .from("reservations")
+    .select("parent_reservation_id, start_time")
+    .in("parent_reservation_id", parentIds)
+    .in("status", ["cancelled", "rejected"]);
+
+  if (error) {
+    console.error("Error fetching cancelled recurring instances:", error);
+    return new Set();
+  }
+
+  return new Set((data ?? []).map((row) => getInstanceKey(row.parent_reservation_id, row.start_time)));
 }
 
 function getOccurrenceStart(originalStart: Date, pattern: string, index: number): Date | null {
@@ -61,7 +92,8 @@ export function getOccurrencesInRange(
 
   const endType = series.recurrence_end_type || "never";
   const maxCount = series.recurrence_count || 52;
-  const endDate = series.recurrence_end_date ? new Date(series.recurrence_end_date) : null;
+  // The end date is inclusive: occurrences on that (Istanbul) calendar day still count
+  const endDayKey = series.recurrence_end_date ? getOccurrenceDayKey(series.recurrence_end_date) : null;
 
   const occurrences: Occurrence[] = [];
 
@@ -71,7 +103,7 @@ export function getOccurrencesInRange(
     const start = getOccurrenceStart(originalStart, series.recurrence_pattern, index);
     if (!start) break;
     // The original event always counts, even if the end date was set before it
-    if (index > 0 && endType === "date" && endDate && start > endDate) break;
+    if (index > 0 && endType === "date" && endDayKey && getOccurrenceDayKey(start) > endDayKey) break;
     if (start > rangeEnd) break;
 
     const end = new Date(start.getTime() + duration);
