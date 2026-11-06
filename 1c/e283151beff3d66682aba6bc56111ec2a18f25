@@ -1,0 +1,31 @@
+src/lib/actions/availability.ts
+  s_50f895ab59e838::t_390063c2951b1f 4
+  s_50f895ab59e838::t_7bcf8d0d851659 208-211,214-227
+  s_50f895ab59e838::t_b48aecd2d1d864 188-190
+src/lib/recurrence.ts
+  s_50f895ab59e838::t_6b41e4d12303a8 1-4
+  s_50f895ab59e838::t_63efd521b765db 95-96
+  s_50f895ab59e838::t_09afa31a313889 106
+  s_50f895ab59e838::t_714d4f0e228386 35-61
+src/lib/actions/reservations.ts
+  s_50f895ab59e838::t_3f9cc2e69f401c 10
+  s_50f895ab59e838::t_a710e79869b681 1625
+  s_50f895ab59e838::t_37909756fd8eb1 1486-1563
+  s_50f895ab59e838::t_c755eeee796f87 193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1ce283151beff3d66682aba6bc56111ec2a18f25",
+  "prompts": {},
+  "sessions": {
+    "s_50f895ab59e838": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "38694107-4a99-43ec-98ae-9e551b3712da",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Enes Usluer <enesusluer@tech-enesusluer.local>"
+    }
+  }
+}
